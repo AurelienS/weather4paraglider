@@ -167,6 +167,106 @@ code {
   font-size: 0.85rem;
 }
 
+.fav-menu {
+  position: relative;
+}
+
+.fav-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.fav-list li {
+  display: flex;
+  align-items: stretch;
+  border-radius: 6px;
+}
+
+.fav-list li:hover {
+  background: #2a3340;
+}
+
+.fav-add {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+  padding: 8px 9px;
+  color: var(--focus);
+  font: 500 0.85rem var(--sans);
+  cursor: pointer;
+}
+
+.fav-add:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.fav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 7px 9px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fav-list li.is-current .fav-item {
+  color: var(--focus);
+}
+
+.fav-label {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fav-coords {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+
+.fav-remove {
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  padding: 0 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fav-remove:hover {
+  color: var(--hard);
+}
+
+.fav-empty {
+  padding: 7px 9px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .place-chip {
   flex-basis: 100%;
   display: flex;
