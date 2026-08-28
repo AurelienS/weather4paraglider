@@ -4,12 +4,8 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import {
-  AROME_DOMAIN,
-  inAromeDomain,
-  placeText,
-  reverseGeocode,
-} from "../lib/geocode";
+import { placeText, reverseGeocode } from "../lib/geocode";
+import { isGlobalDomain, type ModelDef } from "../api/models";
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -20,49 +16,57 @@ L.Icon.Default.mergeOptions({
 type Props = {
   lat: number;
   lon: number;
+  model: ModelDef;
   onCancel: () => void;
   onPick: (lat: number, lon: number, label: string | null) => void;
 };
 
-const MAX_BOUNDS = L.latLngBounds(
-  [AROME_DOMAIN.latMin - 2, AROME_DOMAIN.lonMin - 2],
-  [AROME_DOMAIN.latMax + 2, AROME_DOMAIN.lonMax + 2],
-);
-
-export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
+export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
+  const domain = model.domain;
+  const inDomain = (la: number, lo: number) =>
+    la >= domain.latMin && la <= domain.latMax && lo >= domain.lonMin && lo <= domain.lonMax;
   const holderRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const startPos = useRef({ lat, lon });
+  const startDomain = useRef(model.domain);
   const [pos, setPos] = useState({ lat, lon });
   const [near, setNear] = useState<string | null>(null);
   const [latDraft, setLatDraft] = useState<string | null>(null);
   const [lonDraft, setLonDraft] = useState<string | null>(null);
   const latShown = latDraft ?? pos.lat.toFixed(5);
   const lonShown = lonDraft ?? pos.lon.toFixed(5);
-  const valid = inAromeDomain(pos.lat, pos.lon);
+  const valid = inDomain(pos.lat, pos.lon);
 
   useEffect(() => {
     const el = holderRef.current;
     if (!el) return;
+    const d = startDomain.current;
+    const global = isGlobalDomain(d);
+    const bounds = L.latLngBounds(
+      [d.latMin - 2, d.lonMin - 2],
+      [d.latMax + 2, d.lonMax + 2],
+    );
     const map = L.map(el, {
       center: [startPos.current.lat, startPos.current.lon],
       zoom: 11,
       minZoom: 5,
-      maxBounds: MAX_BOUNDS,
+      maxBounds: global ? undefined : bounds,
       maxBoundsViscosity: 0.8,
     });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution: "&copy; OpenStreetMap",
     }).addTo(map);
-    L.rectangle(
-      [
-        [AROME_DOMAIN.latMin, AROME_DOMAIN.lonMin],
-        [AROME_DOMAIN.latMax, AROME_DOMAIN.lonMax],
-      ],
-      { color: "#c4a35a", weight: 1.5, dashArray: "6 6", fill: false },
-    ).addTo(map);
+    if (!global) {
+      L.rectangle(
+        [
+          [d.latMin, d.lonMin],
+          [d.latMax, d.lonMax],
+        ],
+        { color: "#c4a35a", weight: 1.5, dashArray: "6 6", fill: false },
+      ).addTo(map);
+    }
     const marker = L.marker(
       [startPos.current.lat, startPos.current.lon],
       { draggable: true },
@@ -116,11 +120,7 @@ export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
     const nextLon = Number(lonShown.trim().replace(",", "."));
     setLatDraft(null);
     setLonDraft(null);
-    if (
-      !Number.isFinite(nextLat) ||
-      !Number.isFinite(nextLon) ||
-      !inAromeDomain(nextLat, nextLon)
-    ) {
+    if (!Number.isFinite(nextLat) || !Number.isFinite(nextLon) || !inDomain(nextLat, nextLon)) {
       return;
     }
     setPos({ lat: nextLat, lon: nextLon });
@@ -179,7 +179,7 @@ export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
           </form>
           <span className="map-spacer" />
           {!valid ? (
-            <span className="map-domain-warn">Out of AROME domain</span>
+            <span className="map-domain-warn">Out of {model.short} domain</span>
           ) : null}
           <button
             type="button"

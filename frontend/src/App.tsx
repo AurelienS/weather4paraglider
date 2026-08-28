@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchArome } from "./api/client";
 import type { AromeResponse } from "./api/types";
+import {
+  DEFAULT_MODEL,
+  MODELS,
+  isModelId,
+  modelById,
+  type ModelId,
+} from "./api/models";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
@@ -15,7 +22,7 @@ import {
 } from "./lib/format";
 
 type Point = { lat: number; lon: number };
-type View = "windgram" | "sondage";
+type View = "windgram" | "sounding";
 
 function readPointFromUrl(): Point {
   const q = new URLSearchParams(window.location.search);
@@ -25,15 +32,23 @@ function readPointFromUrl(): Point {
   return { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon };
 }
 
-function writePointToUrl(point: Point) {
+function readModelFromUrl(): ModelId {
+  const q = new URLSearchParams(window.location.search);
+  const raw = q.get("model");
+  return raw != null && isModelId(raw) ? raw : DEFAULT_MODEL;
+}
+
+function writeStateToUrl(point: Point, modelId: ModelId) {
   const url = new URL(window.location.href);
   url.searchParams.set("lat", String(point.lat));
   url.searchParams.set("lon", String(point.lon));
+  url.searchParams.set("model", modelId);
   window.history.replaceState(null, "", url);
 }
 
 export default function App() {
   const [point, setPoint] = useState<Point>(readPointFromUrl);
+  const [modelId, setModelId] = useState<ModelId>(readModelFromUrl);
   const [place, setPlace] = useState<string | null>(null);
   const [bump, setBump] = useState(0);
   const forceRef = useRef(false);
@@ -50,9 +65,9 @@ export default function App() {
     const ac = new AbortController();
     const force = forceRef.current;
     forceRef.current = false;
-    writePointToUrl({ lat: point.lat, lon: point.lon });
+    writeStateToUrl({ lat: point.lat, lon: point.lon }, modelId);
 
-    fetchArome(point.lat, point.lon, { force, signal: ac.signal })
+    fetchArome(point.lat, point.lon, modelId, { force, signal: ac.signal })
       .then((payload) => {
         if (ac.signal.aborted) return;
         const idx = pickDefaultHour(payload.hours);
@@ -75,7 +90,14 @@ export default function App() {
       });
 
     return () => ac.abort();
-  }, [point.lat, point.lon, bump]);
+  }, [point.lat, point.lon, modelId, bump]);
+
+  function selectModel(next: ModelId) {
+    if (next === modelId) return;
+    setLoading(true);
+    setError(null);
+    setModelId(next);
+  }
 
   const days = useMemo(() => (data ? groupByDay(data.hours) : []), [data]);
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
@@ -101,12 +123,13 @@ export default function App() {
     <div className="app">
       <header className="top">
         <div className="brand">
-          <h1>AROME</h1>
-          <p>Windgram 0.025° · T, Td, wind · Météo-France via Open-Meteo</p>
+          <h1>Weather4Paragliding</h1>
+          <p>Windgram &amp; sounding per model · Open-Meteo multi-model</p>
         </div>
         <SiteForm
           lat={point.lat}
           lon={point.lon}
+          model={modelById(modelId)}
           placeLabel={place}
           loading={loading}
           onSubmit={(lat, lon, label) => {
@@ -120,17 +143,18 @@ export default function App() {
         />
       </header>
 
-      {error ? (
-        <div className="banner error" role="alert">
-          <span>{error}</span>
-          <button type="button" className="btn" onClick={refresh}>
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      {loading && !data ? <div className="banner">Extracting profile…</div> : null}
-      {loading && data ? <div className="banner">Updating…</div> : null}
+      <div className="flash">
+        {error ? (
+          <div className="banner error" role="alert">
+            <span>{error}</span>
+            <button type="button" className="btn" onClick={refresh}>
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="banner">{data ? "Updating…" : "Extracting profile…"}</div>
+        ) : null}
+      </div>
 
       {data ? (
         <>
@@ -143,12 +167,28 @@ export default function App() {
             </span>
             <span>model alt. {data.modelElevationM}&nbsp;m</span>
             <span>
-              {data.model} {data.grid}° · {data.openMeteoModel ?? data.source}
+              {data.model} {data.grid} · {data.openMeteoModel ?? data.source}
             </span>
             <span>cache {utcSlot(data.runInitUtc)} UTC</span>
           </p>
 
           <div className="toolbar">
+            <label className="pick">
+              Model
+              <select
+                value={modelId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (isModelId(next)) selectModel(next);
+                }}
+              >
+                {MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.days} days
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="seg" role="tablist" aria-label="Day">
               {days.map((d) => (
                 <button
@@ -173,8 +213,8 @@ export default function App() {
               </button>
               <button
                 type="button"
-                className={view === "sondage" ? "is-on" : undefined}
-                onClick={() => setView("sondage")}
+                className={view === "sounding" ? "is-on" : undefined}
+                onClick={() => setView("sounding")}
               >
                 Sounding
               </button>
@@ -197,7 +237,7 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <label className="hour-pick">
+              <label className="pick">
                 Hour
                 <select
                   value={hour?.time ?? ""}
@@ -230,7 +270,7 @@ export default function App() {
             </>
           ) : null}
 
-          <p className="hint-keys">250 m AMSL grid interpolated between AROME levels</p>
+          <p className="hint-keys">250 m AMSL grid interpolated between model levels</p>
 
           {data.warnings.length > 0 ? (
             <details className="notes">

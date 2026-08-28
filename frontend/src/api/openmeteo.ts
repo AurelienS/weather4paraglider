@@ -1,54 +1,21 @@
-const OM_URL = "https://api.open-meteo.com/v1/meteofrance";
+import { apiVarsFor, type ModelDef } from "./models";
 
-export const OM_MODEL = "arome_france";
-export const OM_GRID = "0.025";
+const OM_URLS = {
+  meteofrance: "https://api.open-meteo.com/v1/meteofrance",
+  forecast: "https://api.open-meteo.com/v1/forecast",
+} as const;
 
-export const HEIGHT_AGL_M: readonly number[] = [20, 50, 100, 150, 200];
-
-export const PRESSURE_HPA: readonly number[] = [
-  1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500,
-];
+export const NO_DATA_REASON = "No data is available for this location";
 
 export type OpenMeteoRaw = {
   latitude?: number;
   longitude?: number;
   elevation?: number;
   hourly?: Record<string, Array<number | string | null>>;
+  minutely_15?: Record<string, Array<number | string | null>>;
   error?: boolean;
   reason?: string;
 };
-
-export function hourlyVars(): string[] {
-  const vars: string[] = [
-    "temperature_2m",
-    "relative_humidity_2m",
-    "dew_point_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_gusts_10m",
-    "cape",
-    "precipitation",
-    "cloud_cover_low",
-    "cloud_cover_mid",
-    "cloud_cover_high",
-    "surface_pressure",
-  ];
-  for (const h of HEIGHT_AGL_M) {
-    vars.push(`temperature_${h}m`, `wind_speed_${h}m`, `wind_direction_${h}m`);
-  }
-  for (const p of PRESSURE_HPA) {
-    vars.push(
-      `temperature_${p}hPa`,
-      `dew_point_${p}hPa`,
-      `relative_humidity_${p}hPa`,
-      `cloud_cover_${p}hPa`,
-      `wind_speed_${p}hPa`,
-      `wind_direction_${p}hPa`,
-      `geopotential_height_${p}hPa`,
-    );
-  }
-  return vars;
-}
 
 export class OpenMeteoError extends Error {
   readonly status: number;
@@ -73,36 +40,89 @@ async function readReason(res: Response): Promise<string> {
   return text.slice(0, 200);
 }
 
+export function decimateMinutelyToHourly(raw: OpenMeteoRaw): OpenMeteoRaw {  const m15 = raw.minutely_15 ?? {};
+  const times = (m15.time ?? []) as string[];
+  const kept: number[] = [];
+  const time: string[] = [];
+  times.forEach((t, i) => {
+    if (typeof t === "string" && t.endsWith(":00")) {
+      kept.push(i);
+      time.push(t);
+    }
+  });
+  const hourly: Record<string, Array<number | string | null>> = { time };
+  for (const [key, series] of Object.entries(m15)) {
+    if (key === "time") continue;
+    hourly[key] = kept.map((i) => series[i] ?? null);
+  }
+  const extra = raw.hourly ?? {};
+  const extraTimes = (extra.time ?? []) as string[];
+  const pos = new Map<string, number>();
+  extraTimes.forEach((t, i) => {
+    if (typeof t === "string") pos.set(t, i);
+  });
+  for (const [key, series] of Object.entries(extra)) {
+    if (key === "time") continue;
+    hourly[key] = time.map((t) => {
+      const i = pos.get(t);
+      return i == null ? null : (series[i] ?? null);
+    });
+  }
+  return { ...raw, hourly };
+}
+
 export async function fetchOpenMeteo(
   lat: number,
   lon: number,
-  opts: { signal?: AbortSignal; forecastDays?: number } = {},
+  model: ModelDef,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<OpenMeteoRaw> {
   const params = new URLSearchParams({
     latitude: lat.toFixed(5),
     longitude: lon.toFixed(5),
-    hourly: hourlyVars().join(","),
-    models: OM_MODEL,
-    forecast_days: String(opts.forecastDays ?? 3),
+    forecast_days: String(model.days),
     timezone: "Europe/Paris",
     wind_speed_unit: "kmh",
     temperature_unit: "celsius",
     cell_selection: "nearest",
     elevation: "nan",
   });
-  const res = await fetch(`${OM_URL}?${params.toString()}`, { signal: opts.signal });
+  if (model.api === "minutely_15") {
+    // The models= parameter rejects the 15-min ids; best-match serves them.
+    params.set("minutely_15", apiVarsFor(model).join(","));
+    if (model.extraHourlyVars?.length) {
+      params.set("hourly", model.extraHourlyVars.join(","));
+    }
+  } else {
+    params.set("models", model.id);
+    params.set("hourly", apiVarsFor(model).join(","));
+  }
+  const res = await fetch(`${OM_URLS[model.endpoint]}?${params.toString()}`, {
+    signal: opts.signal,
+  });
   if (!res.ok) {
     throw new OpenMeteoError(
       `Open-Meteo HTTP ${res.status} : ${(await readReason(res)) || res.statusText}`,
       res.status,
     );
   }
-  const payload = (await res.json()) as OpenMeteoRaw;
+  const text = await res.text();
+  let payload: OpenMeteoRaw;
+  try {
+    payload = JSON.parse(text) as OpenMeteoRaw;
+  } catch {
+    // Out-of-domain points return 200 with invalid JSON ({"latitude":nan,...}).
+    throw new OpenMeteoError(NO_DATA_REASON, 400);
+  }
   if (payload.error) {
     throw new OpenMeteoError(
       String(payload.reason ?? "Open-Meteo returned an error response"),
       502,
     );
+  }
+  if (model.api === "minutely_15") return decimateMinutelyToHourly(payload);
+  if (!payload.hourly?.time?.length) {
+    throw new OpenMeteoError(NO_DATA_REASON, 400);
   }
   return payload;
 }

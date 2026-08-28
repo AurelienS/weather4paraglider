@@ -1,9 +1,16 @@
-# AGENTS.md — Météo parapente
+# AGENTS.md — Weather4Paragliding (w4p)
 
 Frontend-only app: Vite + React 19 + TypeScript. No backend.
-AROME 0.025° data (Météo-France) is fetched directly from the browser through
-the public Open-Meteo API; the point cache lives in each user's `localStorage`
-(3 h slot). Deployable as static files (`frontend/dist/`).
+Weather model data (Météo-France AROME/ARPEGE, MeteoSwiss ICON-CH1, DWD
+ICON-D2, DMI HARMONIE) is fetched directly from the browser through the
+public Open-Meteo API (`/v1/meteofrance` and `/v1/forecast`); the point cache
+lives in each user's `localStorage` (3 h slot, 1 h for the 15-min nowcast).
+Models differ in resolution and forecast window (2–5 days, displayed
+07:00–22:00) — the catalog is `MODELS` in `frontend/src/api/models.ts`.
+Several models only cover part of Europe: when Open-Meteo has no data for a
+point, the user gets an explicit "no data for this location — pick another
+model" message (no silent point clamping). Deployable as static files
+(`frontend/dist/`).
 
 ## Commands
 
@@ -12,6 +19,7 @@ cd frontend
 npm run dev       # dev server on http://127.0.0.1:5173
 npm run build     # tsc -b && vite build
 npm run lint      # oxlint
+npm test          # vitest unit tests (pure logic in src/)
 npm run e2e       # build + Playwright tests (headless, no real network)
 ```
 
@@ -31,22 +39,24 @@ Never commit with failing `npm run lint`, `npm run build` or `npm run e2e`.
   keyboard/mouse interactions.
 - Network: **never depend on a real service in tests.** Use the helpers from
   `frontend/e2e/mock.ts`:
-  - `mockOpenMeteo(page)` — AROME payload generated dynamically (72 h from
-    today's date in Europe/Paris), so it stays deterministic all year;
-    `status` option to simulate 429/5xx.
+  - `mockOpenMeteo(page)` — payload generated dynamically (from today's date
+    in Europe/Paris, so it stays deterministic all year), matching the
+    variables and time step actually requested (`hourly` or `minutely_15`);
+    `status` option to simulate 429/5xx, `noDataFor` option to simulate
+    Open-Meteo's "No data is available for this location" for a model id.
   - `mockPhoton(page)` — geocoding / reverse geocoding.
   - `blockTiles(page)` — call it in `beforeEach` (OSM tiles blocked).
-- Count calls (`const om = await mockOpenMeteo(page)` then `om.calls()`) to
-  test caching and forcing.
+- Count calls (`const om = await mockOpenMeteo(page)` then `om.calls()`;
+  `om.urls()` returns the requested URLs) to test caching and forcing.
 - Each test starts with a fresh context (empty localStorage): do not rely on
   another test's state.
 
 ### Unit tests (pure logic)
 
 - Non-trivial pure logic (parsing, math, profile fusion, time-window
-  handling…) must live in testable functions (`src/lib/`, `src/api/`) and be
-  covered by unit tests (framework: Vitest — install with
-  `npm i -D vitest` if absent).
+  handling, minutely→hourly decimation…) must live in testable functions
+  (`src/lib/`, `src/api/`) and be covered by unit tests (framework: Vitest,
+  configured in `vite.config.ts` — only `src/**/*.test.ts`).
 - React components stay covered by e2e; do not unit-test them unless they
   contain complex internal logic.
 

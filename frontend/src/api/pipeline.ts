@@ -1,4 +1,5 @@
-import { HEIGHT_AGL_M, OM_GRID, OM_MODEL, PRESSURE_HPA, type OpenMeteoRaw } from "./openmeteo";
+import type { OpenMeteoRaw } from "./openmeteo";
+import { type ModelDef } from "./models";
 import type { AromeResponse, Hour, ProfilePoint, Surface } from "./types";
 
 export const MERGE_MIN_DZ_M = 80;
@@ -81,10 +82,10 @@ function parseParisWall(value: string): { instant: number; offsetMs: number } | 
   return { instant: pseudo - offsetMs, offsetMs };
 }
 
-export function cacheSlotUtc(nowMs: number = Date.now()): string {
+export function cacheSlotUtc(nowMs: number = Date.now(), slotHours = 3): string {
   const d = new Date(nowMs);
   d.setUTCMinutes(0, 0, 0);
-  d.setUTCHours(d.getUTCHours() - (d.getUTCHours() % 3));
+  d.setUTCHours(d.getUTCHours() - (d.getUTCHours() % slotHours));
   return `${d.toISOString().slice(0, 19)}Z`;
 }
 
@@ -95,11 +96,11 @@ export type TimeWindow = {
   toISO: string;
 };
 
-export function resolveWindow(nowMs: number = Date.now()): TimeWindow {
+export function resolveWindow(nowMs: number = Date.now(), days = 3): TimeWindow {
   const startParts = parisParts(nowMs);
   const startPseudo = Date.UTC(startParts.y, startParts.m - 1, startParts.d, 7, 0);
   const start = startPseudo - parisOffsetMs(startPseudo);
-  const endParts = parisParts(nowMs + 2 * 86_400_000);
+  const endParts = parisParts(nowMs + (days - 1) * 86_400_000);
   const endPseudo = Date.UTC(endParts.y, endParts.m - 1, endParts.d, 22, 0);
   const end = endPseudo - parisOffsetMs(endPseudo);
   return {
@@ -132,7 +133,7 @@ function at(hourly: Hourly, key: string, index: number): number | null {
   return num(series[index]);
 }
 
-function heightPoints(hourly: Hourly, i: number, elev: number): ProfilePoint[] {
+function heightPoints(hourly: Hourly, i: number, elev: number, agl: readonly number[]): ProfilePoint[] {
   const points: ProfilePoint[] = [
     {
       z: Math.round(elev + 2),
@@ -145,7 +146,7 @@ function heightPoints(hourly: Hourly, i: number, elev: number): ProfilePoint[] {
       cloud: null,
     },
   ];
-  for (const h of HEIGHT_AGL_M) {
+  for (const h of agl) {
     const t = at(hourly, `temperature_${h}m`, i);
     const wind = at(hourly, `wind_speed_${h}m`, i);
     const dir = at(hourly, `wind_direction_${h}m`, i);
@@ -164,9 +165,9 @@ function heightPoints(hourly: Hourly, i: number, elev: number): ProfilePoint[] {
   return points;
 }
 
-function isobarPoints(hourly: Hourly, i: number): ProfilePoint[] {
+function isobarPoints(hourly: Hourly, i: number, levels: readonly number[]): ProfilePoint[] {
   const points: ProfilePoint[] = [];
-  for (const p of PRESSURE_HPA) {
+  for (const p of levels) {
     const z = at(hourly, `geopotential_height_${p}hPa`, i);
     if (z == null) continue;
     points.push({
@@ -223,9 +224,41 @@ function surfaceOf(hourly: Hourly, i: number, profile: ProfilePoint[]): Surface 
   };
 }
 
+/**
+ * True when the hour carries at least one value. Open-Meteo fills the
+ * requested range with time stamps even beyond a run's horizon (all nulls) —
+ * such hours are dropped so day tabs only show days that have data.
+ */
+export function hourHasData(surface: Surface, profile: ProfilePoint[]): boolean {
+  const surfaceValues = [
+    surface.t2m,
+    surface.rh2m,
+    surface.wind10,
+    surface.dir10,
+    surface.gust10,
+    surface.cape,
+    surface.precip,
+    surface.cloudLow,
+    surface.cloudMid,
+    surface.cloudHigh,
+    surface.psfc,
+  ];
+  if (surfaceValues.some((v) => v != null)) return true;
+  return profile.some(
+    (p) =>
+      p.t != null ||
+      p.rh != null ||
+      p.td != null ||
+      p.wind != null ||
+      p.dir != null ||
+      p.cloud != null,
+  );
+}
+
 export function assembleResponse(
   lat: number,
   lon: number,
+  model: ModelDef,
   raw: OpenMeteoRaw,
   slot: string,
   window: TimeWindow,
@@ -235,8 +268,8 @@ export function assembleResponse(
   const elev = num(raw.elevation) ?? 0;
   const [rlat, rlon] = roundPoint(lat, lon);
   const warnings = [
-    "source=open-meteo models=arome_france (0.025°). No seamless, no HD, no ARPEGE.",
-    "runInitUtc = Open-Meteo 3 h cache slot, not the Météo-France run init time.",
+    `source=open-meteo models=${model.id} (${model.grid}).`,
+    `runInitUtc = Open-Meteo ${model.slotHours} h cache slot, not the model run init time.`,
     "Isobaric Td: derived by Open-Meteo from T+RH. AGL Td beyond 2 m: null (not published).",
     CLOUD_BASE_RULE,
   ];
@@ -247,8 +280,8 @@ export function assembleResponse(
     if (!parsed) continue;
     if (parsed.instant < window.start || parsed.instant > window.end) continue;
     const profile = fuseProfile(
-      heightPoints(hourly, i, elev),
-      isobarPoints(hourly, i),
+      heightPoints(hourly, i, elev, model.aglHeights),
+      isobarPoints(hourly, i, model.pressureLevels),
       elev,
     );
     hours.push({
@@ -259,10 +292,9 @@ export function assembleResponse(
   }
 
   return {
-    model: "AROME",
-    grid: OM_GRID,
-    source: "open-meteo",
-    openMeteoModel: OM_MODEL,
+    model: model.family,
+    grid: model.grid,
+    source: "open-meteo",    openMeteoModel: model.id,
     lat,
     lon,
     modelElevationM: Math.round(elev),
@@ -271,12 +303,18 @@ export function assembleResponse(
     runAvailable: true,
     timezone: PARIS,
     fetchedAt: new Date().toISOString().slice(0, 19) + "Z",
-    hours,
+    hours: hours.filter((h) => hourHasData(h.surface, h.profile)),
     warnings,
     cloudBaseRule: CLOUD_BASE_RULE,
     attribution:
-      "Météo-France AROME data via Open-Meteo (CC BY 4.0). " +
-      "Licence Ouverte 2.0 / Météo-France. " +
-      "https://open-meteo.com/en/licence",
+      model.family === "MeteoSwiss"
+        ? "MeteoSwiss ICON-CH1 data via Open-Meteo (CC BY 4.0). https://open-meteo.com/en/licence"
+        : model.family === "ICON"
+          ? "© Deutscher Wetterdienst (DWD), ICON model, via Open-Meteo (CC BY 4.0). https://open-meteo.com/en/licence"
+          : model.family === "HARMONIE"
+            ? "DMI HARMONIE AROME data via Open-Meteo (CC BY 4.0). https://open-meteo.com/en/licence"
+            : "Météo-France data via Open-Meteo (CC BY 4.0). " +
+              "Licence Ouverte 2.0 / Météo-France. " +
+              "https://open-meteo.com/en/licence",
   };
 }

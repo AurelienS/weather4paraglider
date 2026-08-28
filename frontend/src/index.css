@@ -87,6 +87,7 @@ code {
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: flex-end;
+  position: relative;
 }
 
 .site-form label {
@@ -267,22 +268,34 @@ code {
   font-size: 0.85rem;
 }
 
+/* Own line between the place input and the action buttons. Inline-size
+   containment keeps the long single-line label out of the form's intrinsic
+   width so picking a place never changes the header height. */
 .place-chip {
   flex-basis: 100%;
+  contain: inline-size;
+  height: 20px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: baseline;
   gap: 4px 12px;
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .place-chip strong {
   color: var(--text);
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .place-chip span {
+  flex-shrink: 0;
   font-family: var(--mono);
   font-size: 0.8rem;
 }
@@ -422,8 +435,24 @@ code {
   font-size: 0.85rem;
 }
 
+/* Floating notice slot: zero height, notices overlay the content below
+   without ever shifting the layout (flow-root keeps the banner margin
+   from collapsing through the zero-height container). */
+.flash {
+  height: 0;
+  overflow: visible;
+  display: flow-root;
+  position: relative;
+  z-index: 30;
+}
+
+.flash .banner {
+  position: relative;
+  margin: 14px 0 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
 .banner {
-  margin: 16px 0 0;
   padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -471,6 +500,7 @@ code {
 
 .seg {
   display: flex;
+  flex-wrap: wrap;
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -495,7 +525,7 @@ code {
   color: var(--text);
 }
 
-.hour-pick {
+.pick {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -505,7 +535,7 @@ code {
   color: var(--muted);
 }
 
-.hour-pick select {
+.pick select {
   appearance: none;
   background: var(--panel);
   color: var(--text);

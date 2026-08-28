@@ -5,6 +5,7 @@ import {
   altitudeLevels,
   convectiveTop,
   cssRgb,
+  iso0CellZ,
   sampleCell,
   windRgb,
   cellBackground,
@@ -46,14 +47,10 @@ export function Windgram({ hours, elevationM, zMax }: Props) {
       slots.map((slot, col) => {
         const hour = slot.data;
         if (!hour) return null;
-        if (hour.surface.t2m != null && hour.surface.t2m <= 0) return elevationM;
         const rows = grid[col];
         if (!rows) return null;
-        for (let i = levels.length - 1; i >= 0; i--) {
-          const cell = rows[i];
-          if (cell?.t != null && cell.t <= 0) return levels[i] ?? null;
-        }
-        return null;
+        const temps = rows.map((c) => c?.t ?? null);
+        return iso0CellZ(levels, temps, hour.surface.t2m, elevationM);
       }),
     [slots, grid, levels, elevationM],
   );

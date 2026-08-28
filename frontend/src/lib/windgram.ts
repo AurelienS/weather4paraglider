@@ -43,6 +43,30 @@ export function altitudeLevels(elevM: number, zMax: number, step = ALT_STEP_M): 
   return levels;
 }
 
+/**
+ * AMSL altitude of the row carrying the 0 °C isotherm line: the row just
+ * BELOW the lowest sub-zero cell, so the line sits on the shared edge
+ * between the sub-zero cell and the above-zero cell under it.
+ * levels/temps are sorted high -> low altitude. Falls back to the ground row
+ * (elevM) when the transition happens between the lowest row and the ground.
+ */
+export function iso0CellZ(
+  levels: readonly number[],
+  temps: readonly (number | null)[],
+  groundT: number | null,
+  elevM: number,
+): number | null {
+  for (let i = levels.length - 1; i >= 0; i--) {
+    const t = temps[i];
+    if (t == null) continue;
+    if (t <= 0) {
+      if (i + 1 < levels.length) return levels[i + 1] ?? null;
+      return groundT != null && groundT > 0 ? elevM : null;
+    }
+  }
+  return groundT != null && groundT <= 0 ? elevM : null;
+}
+
 const DALR = 9.8;
 /** Modified Holzworth / NWP: theta_v,env = theta_v,ground + 0.5 K (AMT 2022, Coniglio 2013). */
 const LID_K = 0.5;

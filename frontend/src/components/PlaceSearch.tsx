@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { searchPlaces, type Place } from "../lib/geocode";
+import type { ModelDef } from "../api/models";
 
 type Props = {
   disabled: boolean;
+  model: ModelDef;
   onPick: (place: Place) => void;
 };
 
-export function PlaceSearch({ disabled, onPick }: Props) {
+export function PlaceSearch({ disabled, model, onPick }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -25,7 +27,7 @@ export function PlaceSearch({ disabled, onPick }: Props) {
     const timer = window.setTimeout(() => {
       setSearching(true);
       setFailed(false);
-      searchPlaces(q, ac.signal)
+      searchPlaces(q, ac.signal, model.domain)
         .then((places) => {
           if (ac.signal.aborted) return;
           setResults(places);
@@ -45,7 +47,7 @@ export function PlaceSearch({ disabled, onPick }: Props) {
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [query]);
+  }, [query, model.domain]);
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {

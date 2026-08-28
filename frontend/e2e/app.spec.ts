@@ -8,10 +8,72 @@ test.beforeEach(async ({ page }: { page: Page }) => {
 test("renders the AROME windgram for the URL point", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page).toHaveURL(/model=arome_france/);
   await expect(page.locator(".meta")).toContainText("AROME 0.025°");
   await expect(page.locator(".meta")).toContainText("model alt. 1696");
   await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(3);
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
+});
+
+test("model selection switches the forecast window and URL", async ({ page }) => {
+  const om = await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(3);
+
+  const modelPick = page.getByLabel("Model");
+  await expect(modelPick.locator("option")).toHaveCount(8);
+
+  await modelPick.selectOption("arpege_europe");
+  await expect(page).toHaveURL(/model=arpege_europe/);
+  await expect(page.locator(".meta")).toContainText("arpege_europe");
+  await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(4);
+
+  await modelPick.selectOption("arome_france_hd");
+  await expect(page).toHaveURL(/model=arome_france_hd/);
+  await expect(page.locator(".meta")).toContainText("0.01°");
+  await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(2);
+
+  await modelPick.selectOption("meteoswiss_icon_ch1");
+  await expect(page).toHaveURL(/model=meteoswiss_icon_ch1/);
+  await expect(page.locator(".meta")).toContainText("meteoswiss_icon_ch1");
+  await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(5);
+
+  // switching back to arome_france hits the localStorage cache again
+  const before = om.calls();
+  await modelPick.selectOption("arome_france");
+  await expect(page.locator(".meta")).toContainText("0.025°");
+  expect(om.calls()).toBe(before);
+});
+
+test("15-minute nowcast model decimates to hourly and caches", async ({ page }) => {
+  const om = await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71&model=arome_france_15min");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator(".meta")).toContainText("arome_france_15min");
+  expect(om.urls().some((u) => u.includes("minutely_15="))).toBe(true);
+  const after = om.calls();
+  await page.reload();
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  expect(om.calls()).toBe(after);
+});
+
+test("model without coverage for the point says so without calling the API", async ({ page }) => {
+  const om = await mockOpenMeteo(page);
+  await page.goto("/?lat=43.29&lon=-0.37&model=meteoswiss_icon_ch1");
+  const banner = page.locator(".banner.error");
+  await expect(banner).toContainText("MeteoSwiss ICON CH1 1 km has no data for this location");
+  await expect(banner).toContainText("Pick another model");
+  expect(om.calls()).toBe(0);
+});
+
+test("out-of-domain API response maps to a model-not-available message", async ({ page }) => {
+  const om = await mockOpenMeteo(page, { noDataFor: "icon_d2" });
+  await page.goto("/?lat=43.30&lon=5.37&model=icon_d2");
+  const banner = page.locator(".banner.error");
+  await expect(banner).toContainText("DWD ICON D2 2.2 km has no data for this location");
+  await expect(banner.locator('button:has-text("Retry")')).toBeVisible();
+  expect(om.calls()).toBe(1);
 });
 
 test("without URL params, falls back to the Aravis demo point", async ({ page }) => {
@@ -77,6 +139,63 @@ test("no network: connection message", async ({ page }) => {
   await expect(page.locator(".banner.error")).toContainText(
     "Could not reach Open-Meteo — check your internet connection",
   );
+});
+
+test("0 °C isotherm sits between the sub-zero and above-zero cells", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  const warmRow = page.locator('.wg tbody tr:has(th:text-is("2250"))');
+  const coldRow = page.locator('.wg tbody tr:has(th:text-is("2500"))');
+  await expect(warmRow.locator("td.cell").first()).toHaveClass(/iso0/);
+  await expect(coldRow.locator("td.cell").first()).not.toHaveClass(/iso0/);
+});
+
+test("layout stays put while loading and after picking a place", async ({ page }) => {
+  const om = await mockOpenMeteo(page, { delay: 600 });
+  await mockPhoton(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  const tableTop = await page
+    .locator(".wg")
+    .evaluate((el) => el.getBoundingClientRect().top);
+  const headerBottom = await page
+    .locator("header.top")
+    .evaluate((el) => el.getBoundingClientRect().bottom);
+
+  await page.locator('button:has-text("Refresh")').click();
+  await expect(page.locator(".banner")).toBeVisible();
+  const duringLoad = await page
+    .locator(".wg")
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(Math.abs(duringLoad - tableTop)).toBeLessThan(1);
+  await expect(page.locator('button:has-text("Refresh")')).toBeEnabled({ timeout: 15_000 });
+
+  await page.locator("#place").fill("chamo");
+  await expect(page.locator(".place-menu")).toBeVisible();
+  await page.locator('.place-menu button:has-text("Chamonix-Mont-Blanc")').click();
+  await expect(page.locator(".place-chip strong")).toContainText("Chamonix-Mont-Blanc");
+  const afterPlace = await page
+    .locator(".wg")
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(Math.abs(afterPlace - tableTop)).toBeLessThan(1);
+  const headerBottomAfter = await page
+    .locator("header.top")
+    .evaluate((el) => el.getBoundingClientRect().bottom);
+  expect(Math.abs(headerBottomAfter - headerBottom)).toBeLessThan(1);
+  const chipBox = await page.locator(".place-chip").boundingBox();
+  const inputBox = await page.locator("#place").boundingBox();
+  const actionsBox = await page.locator(".site-form-actions").boundingBox();
+  expect(chipBox!.y).toBeGreaterThanOrEqual(inputBox!.y + inputBox!.height);
+  expect(chipBox!.y + chipBox!.height).toBeLessThanOrEqual(actionsBox!.y);
+  expect(om.calls()).toBeGreaterThan(1);
+});
+
+test("day tabs stop at the last hour that actually carries data", async ({ page }) => {
+  await mockOpenMeteo(page, { nullsAfterHours: 48 });
+  await page.goto("/?lat=45.945&lon=6.71&model=meteoswiss_icon_ch1");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(2);
+  await expect(page.locator(".meta")).toContainText("meteoswiss_icon_ch1");
 });
 
 test("place search loads a new point", async ({ page }) => {

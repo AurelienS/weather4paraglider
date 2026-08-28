@@ -1,8 +1,8 @@
 import { readPointCache, writePointCache } from "./cache";
 import { assembleResponse, cacheSlotUtc, resolveWindow, roundPoint } from "./pipeline";
-import { fetchOpenMeteo, OpenMeteoError } from "./openmeteo";
+import { fetchOpenMeteo, NO_DATA_REASON, OpenMeteoError } from "./openmeteo";
 import type { AromeResponse } from "./types";
-import { inAromeDomain } from "../lib/geocode";
+import { inModelDomain, modelById, type ModelDef, type ModelId } from "./models";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -12,6 +12,13 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+function noDataMessage(model: ModelDef): string {
+  return (
+    `${model.label} has no data for this location: this model covers a smaller area. ` +
+    "Pick another model in the toolbar (AROME covers all of France)."
+  );
 }
 
 function friendlyMessage(err: unknown): string {
@@ -37,7 +44,7 @@ function friendlyMessage(err: unknown): string {
   }
   return err instanceof Error && err.message
     ? err.message
-    : "Une erreur inattendue est survenue.";
+    : "An unexpected error occurred.";
 }
 
 export type FetchAromeOpts = {
@@ -48,18 +55,17 @@ export type FetchAromeOpts = {
 export async function fetchArome(
   lat: number,
   lon: number,
+  modelId: ModelId,
   opts: FetchAromeOpts = {},
 ): Promise<AromeResponse> {
-  if (!inAromeDomain(lat, lon)) {
-    throw new ApiError(
-      "Point hors domaine AROME (lat 37.5–55.4 N, lon 12 W–16 E).",
-      400,
-    );
+  const model = modelById(modelId);
+  if (!inModelDomain(lat, lon, model.domain)) {
+    throw new ApiError(noDataMessage(model), 400);
   }
-  const slot = cacheSlotUtc();
-  const window = resolveWindow();
+  const slot = cacheSlotUtc(Date.now(), model.slotHours);
+  const window = resolveWindow(Date.now(), model.days);
   const [rlat, rlon] = roundPoint(lat, lon);
-  const key = `${rlat.toFixed(2)}_${rlon.toFixed(2)}|${slot}|${window.fromISO}|${window.toISO}`;
+  const key = `${model.id}|${rlat.toFixed(2)}_${rlon.toFixed(2)}|${slot}|${window.fromISO}|${window.toISO}`;
 
   if (!opts.force) {
     const cached = readPointCache(key, slot, window.fromISO, window.toISO);
@@ -68,13 +74,19 @@ export async function fetchArome(
 
   let raw;
   try {
-    raw = await fetchOpenMeteo(lat, lon, { signal: opts.signal });
+    raw = await fetchOpenMeteo(lat, lon, model, { signal: opts.signal });
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
+    if (
+      err instanceof OpenMeteoError &&
+      err.message.includes(NO_DATA_REASON)
+    ) {
+      throw new ApiError(noDataMessage(model), 400);
+    }
     throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err), 502);
   }
 
-  const payload = assembleResponse(lat, lon, raw, slot, window);
+  const payload = assembleResponse(lat, lon, model, raw, slot, window);
   writePointCache(key, slot, window.fromISO, window.toISO, payload);
   return payload;
 }

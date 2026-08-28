@@ -1,25 +1,11 @@
+import type { ModelDomain } from "../api/models";
+
 export type Place = {
   lat: number;
   lon: number;
   label: string;
   detail: string;
 };
-
-export const AROME_DOMAIN = {
-  latMin: 37.5,
-  latMax: 55.4,
-  lonMin: -12,
-  lonMax: 16,
-} as const;
-
-export function inAromeDomain(lat: number, lon: number): boolean {
-  return (
-    lat >= AROME_DOMAIN.latMin &&
-    lat <= AROME_DOMAIN.latMax &&
-    lon >= AROME_DOMAIN.lonMin &&
-    lon <= AROME_DOMAIN.lonMax
-  );
-}
 
 type PhotonFeature = {
   geometry?: { coordinates?: [number, number] };
@@ -56,15 +42,18 @@ const PHOTON = "https://photon.komoot.io";
 export async function searchPlaces(
   query: string,
   signal?: AbortSignal,
+  domain?: ModelDomain,
 ): Promise<Place[]> {
   const url = new URL(`${PHOTON}/api/`);
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "6");
   url.searchParams.set("lang", "fr");
-  url.searchParams.set(
-    "bbox",
-    `${AROME_DOMAIN.lonMin},${AROME_DOMAIN.latMin},${AROME_DOMAIN.lonMax},${AROME_DOMAIN.latMax}`,
-  );
+  if (domain && domain.lonMax - domain.lonMin < 350) {
+    url.searchParams.set(
+      "bbox",
+      `${domain.lonMin},${domain.latMin},${domain.lonMax},${domain.latMax}`,
+    );
+  }
   const res = await fetch(url.toString(), { signal });
   if (!res.ok) throw new Error(`Search unavailable (${res.status}).`);
   const payload = (await res.json()) as { features?: PhotonFeature[] };
