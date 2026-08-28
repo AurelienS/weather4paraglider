@@ -1,0 +1,37 @@
+name: Deploy Prod
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /mnt/data/weather4paragliding
+            git fetch origin
+            git reset --hard origin/prod
+
+            # Build les nouvelles images
+            docker compose build
+
+            # Redémarre les services un par un (zero downtime)
+            services=$(docker compose config --services)
+
+            for service in $services; do
+              echo "Updating $service..."
+              docker compose up -d --no-deps $service
+              sleep 5
+            done
+
+            # Nettoie les anciennes images
+            docker image prune -f

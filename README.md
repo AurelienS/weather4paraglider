@@ -45,3 +45,53 @@ npm run e2e
 No backend: the `dist/` folder can be hosted on any static hosting.
 Data: Météo-France AROME via Open-Meteo (CC BY 4.0); the Open-Meteo quota is
 consumed per visitor (per IP).
+
+## Deployment
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Local deployment
+
+1. Clone the repository:
+
+```text
+git clone https://github.com/AurelienS/weather4paraglider.git
+cd weather4paraglider
+```
+
+2. Start the app with Docker Compose:
+
+```text
+docker compose up -d
+```
+
+or serve the static build directly:
+
+```text
+cd frontend
+npm run build
+npm run preview
+```
+
+The app is then available at http://localhost:8080.
+
+### Production (VPS + Traefik)
+
+The `docker-compose.yml` exposes the container on port 8080 behind an external
+`traefik_default` network and requests a Let's Encrypt certificate for
+`weather4paragliding.codeas.me`.
+
+Deployment is automated: pushing to the `prod` branch triggers the
+`Deploy Prod` workflow (`.github/workflows/deploy.yml`), which SSHes into the
+VPS (secrets `VPS_HOST`, `VPS_SSH_KEY`), hard-resets
+`/mnt/data/weather4paragliding` to `origin/prod`, rebuilds the image and
+restarts the services one by one.
+
+### Notes
+
+- The container is stateless: the point cache lives in each visitor's
+  `localStorage`, so no Docker volume is needed.
+- Logs: `docker compose logs -f app` — Stop: `docker compose down`.

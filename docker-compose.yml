@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    networks:
+      - traefik_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.w4p.rule=Host(`weather4paragliding.codeas.me`)"
+      - "traefik.http.routers.w4p.entrypoints=websecure"
+      - "traefik.http.routers.w4p.tls.certresolver=letsencrypt"
+
+networks:
+  traefik_default:
+    external: true
