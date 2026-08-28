@@ -6,9 +6,26 @@ type Props = {
   disabled: boolean;
   model: ModelDef;
   onPick: (place: Place) => void;
+  /** DOM id for the input (must be unique per page). */
+  id?: string;
+  /** Visible uppercase label; omit to render only the input. */
+  label?: string;
+  /** Accessible name when the visible label is omitted. */
+  ariaLabel?: string;
+  placeholder?: string;
+  compact?: boolean;
 };
 
-export function PlaceSearch({ disabled, model, onPick }: Props) {
+export function PlaceSearch({
+  disabled,
+  model,
+  onPick,
+  id = "place",
+  label = "Place",
+  ariaLabel,
+  placeholder = "Search a place — Chamonix, Annecy…",
+  compact = false,
+}: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -84,13 +101,35 @@ export function PlaceSearch({ disabled, model, onPick }: Props) {
   }
 
   return (
-    <div className="place-search" ref={boxRef}>
-      <label className="place-search-field">
-        Place
+    <div className={compact ? "place-search is-compact" : "place-search"} ref={boxRef}>
+      {label ? (
+        <label className="place-search-field">
+          {label}
+          <input
+            id={id}
+            type="search"
+            placeholder={placeholder}
+            autoComplete="off"
+            spellCheck={false}
+            value={query}
+            disabled={disabled}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => {
+              if (results.length > 0) setOpen(true);
+            }}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded={showMenu}
+            aria-controls={`${id}-results`}
+            aria-autocomplete="list"
+          />
+        </label>
+      ) : (
         <input
-          id="place"
+          id={id}
           type="search"
-          placeholder="Search a place — Chamonix, Annecy…"
+          aria-label={ariaLabel ?? placeholder}
+          placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
           value={query}
@@ -102,12 +141,12 @@ export function PlaceSearch({ disabled, model, onPick }: Props) {
           onKeyDown={onKeyDown}
           role="combobox"
           aria-expanded={showMenu}
-          aria-controls="place-results"
+          aria-controls={`${id}-results`}
           aria-autocomplete="list"
         />
-      </label>
+      )}
       {showMenu ? (
-        <ul className="place-menu" id="place-results" role="listbox">
+        <ul className="place-menu" id={`${id}-results`} role="listbox">
           {searching && results.length === 0 ? (
             <li className="place-empty">Searching…</li>
           ) : null}

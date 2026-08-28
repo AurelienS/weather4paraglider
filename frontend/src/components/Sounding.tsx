@@ -94,6 +94,18 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
                 className={iso.t === 0 ? "grid iso0" : "grid iso-t"}
               />
             ))}
+            {layout.isoLabels.map((l) => (
+              <text
+                key={`isolab-${l.t}`}
+                x={l.x}
+                y={l.y}
+                className="line-label"
+                textAnchor="middle"
+                transform={`rotate(${l.angle} ${l.x} ${l.y})`}
+              >
+                {l.text}
+              </text>
+            ))}
             <path d={layout.groundPath} className="ground" />
             {layout.cloudBaseY != null ? (
               <line
@@ -105,13 +117,24 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
               />
             ) : null}
             {layout.dalrX != null ? (
-              <line
-                x1={layout.dalrX}
-                y1={PAD.top}
-                x2={layout.dalrX}
-                y2={layout.plotBottom}
-                className="dalr"
-              />
+              <>
+                <line
+                  x1={layout.dalrX}
+                  y1={PAD.top}
+                  x2={layout.dalrX}
+                  y2={layout.plotBottom}
+                  className="dalr"
+                />
+                <text
+                  x={layout.dalrX + 12}
+                  y={layout.plotBottom - 8}
+                  className="line-label"
+                  textAnchor="start"
+                  transform={`rotate(-90 ${layout.dalrX + 12} ${layout.plotBottom - 8})`}
+                >
+                  dry adiabat
+                </text>
+              </>
             ) : null}
             <path d={layout.tPath} className="curve-t" />
             {layout.tdPath ? <path d={layout.tdPath} className="curve-td" /> : null}
@@ -316,8 +339,20 @@ function buildLayout(hour: Hour, elevationM: number) {
   const isoPaths = isoTemps.map((t) => {
     const a = { x: xTh(thetaOf(t, zMin, zRef)), y: yOf(zMin) };
     const b = { x: xTh(thetaOf(t, zMax, zRef)), y: yOf(zMax) };
-    return { t, d: linePath([a, b]) };
+    return { t, d: linePath([a, b]), a, b };
   });
+  const isoLabels = isoPaths
+    .map(({ t, a, b }) => {
+      const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      // keep the label inside the plot: when the line exits through the right
+      // edge, stop shortly before the crossing point
+      const pEdge = b.x > a.x ? Math.min(1, (tempRight - a.x) / (b.x - a.x)) : 1;
+      const p = Math.min(0.8, pEdge * 0.85);
+      const x = a.x + (b.x - a.x) * p;
+      const y = a.y + (b.y - a.y) * p;
+      return { t, x, y, angle, text: t === 0 ? "0 °C" : `${t}°` };
+    })
+    .filter((l) => l.x > PAD.left + 16 && l.x < tempRight - 16);
 
   const gy = yOf(elevationM);
   const groundPath = `M${PAD.left},${plotBottom} L${PAD.left},${gy} L${tempRight},${gy} L${tempRight},${plotBottom} Z`;
@@ -342,6 +377,7 @@ function buildLayout(hour: Hour, elevationM: number) {
     windDots: windPts,
     dalrX,
     isoPaths,
+    isoLabels,
     groundPath,
     cloudBaseY: hour.surface.cloudBaseM != null ? yOf(hour.surface.cloudBaseM) : null,
   };

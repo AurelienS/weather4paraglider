@@ -1,6 +1,6 @@
 import type { AromeResponse } from "./types";
 
-const KEY = "w4p.arome.cache.v2";
+const KEY = "w4p.arome.cache.v3";
 const MAX_ENTRIES = 6;
 
 type Entry = {

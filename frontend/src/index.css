@@ -170,6 +170,8 @@ code {
 
 .fav-menu {
   position: relative;
+  display: flex;
+  gap: 8px;
 }
 
 .fav-list {
@@ -199,24 +201,6 @@ code {
   background: #2a3340;
 }
 
-.fav-add {
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 4px;
-  padding: 8px 9px;
-  color: var(--focus);
-  font: 500 0.85rem var(--sans);
-  cursor: pointer;
-}
-
-.fav-add:disabled {
-  color: var(--faint);
-  cursor: default;
-}
-
 .fav-item {
   flex: 1;
   display: flex;
@@ -233,6 +217,11 @@ code {
 
 .fav-list li.is-current .fav-item {
   color: var(--focus);
+}
+
+.fav-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .fav-label {
@@ -271,39 +260,42 @@ code {
 /* Own line between the place input and the action buttons. Inline-size
    containment keeps the long single-line label out of the form's intrinsic
    width so picking a place never changes the header height. */
-.place-chip {
-  flex-basis: 100%;
-  contain: inline-size;
-  height: 20px;
+.place-line {
   display: flex;
-  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 4px 12px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.85rem;
+  gap: 12px;
+  margin: 2px 0 6px;
   white-space: nowrap;
   overflow: hidden;
 }
 
-.place-chip strong {
+.place-line strong {
+  font: 600 1.05rem var(--sans);
   color: var(--text);
-  font-weight: 600;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.place-chip span {
-  flex-shrink: 0;
-  font-family: var(--mono);
-  font-size: 0.8rem;
+.place-line .fav-add {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+}
+
+.fav-add.is-hidden {
+  visibility: hidden;
 }
 
 .site-form-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.site-form-secondary {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .btn {
@@ -543,6 +535,123 @@ code {
   border-radius: 8px;
   padding: 7px 10px;
   font: 500 0.85rem var(--mono);
+}
+
+.pick-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: #4aa3c8;
+  cursor: pointer;
+}
+
+.pick-check {
+  cursor: pointer;
+  user-select: none;
+}
+
+.board {
+  margin: 4px 0 22px;
+}
+
+.board-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+  margin-bottom: 12px;
+}
+
+.board-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.place-search.is-compact input {
+  width: 230px;
+  padding: 6px 9px;
+  font-size: 0.85rem;
+}
+
+.board-head h2 {
+  margin: 0;
+  font: 600 0.95rem var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.85rem;
+}
+
+.board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.board-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+}
+
+.board-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.board-card-name {
+  color: var(--text);
+  font: 600 0.95rem var(--sans);
+}
+
+.board-card-remove {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-card-remove:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.board-card-note {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.board-card-note.error {
+  color: #e08484;
+}
+
+.board-card-foot {
+  margin: 10px 0 0;
+  color: var(--faint);
+  font-size: 0.78rem;
+}
+
+.board-card .wg {
+  margin-bottom: 0;
 }
 
 .hint-keys {
@@ -836,10 +945,17 @@ code {
 .tick-y,
 .tick-x,
 .axis-title,
-.anno {
+.anno,
+.line-label {
   fill: var(--muted);
   font-family: var(--mono);
   font-size: 11px;
+}
+
+.line-label {
+  fill: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.03em;
 }
 
 .axis-title {

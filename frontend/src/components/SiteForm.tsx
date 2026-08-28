@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { DEMO_POINT } from "../lib/format";
 import type { Favorite } from "../lib/favorites";
 import type { Place } from "../lib/geocode";
 import { type ModelDef } from "../api/models";
@@ -11,13 +10,27 @@ type Props = {
   lat: number;
   lon: number;
   model: ModelDef;
-  placeLabel: string | null;
   loading: boolean;
+  compare: boolean;
+  favs: Favorite[];
+  onFavoriteRemove: (fav: Favorite) => void;
+  onCompareChange: (next: boolean) => void;
   onSubmit: (lat: number, lon: number, label?: string | null) => void;
   onRefresh: () => void;
 };
 
-export function SiteForm({ lat, lon, model, placeLabel, loading, onSubmit, onRefresh }: Props) {
+export function SiteForm({
+  lat,
+  lon,
+  model,
+  loading,
+  compare,
+  favs,
+  onFavoriteRemove,
+  onCompareChange,
+  onSubmit,
+  onRefresh,
+}: Props) {
   const [mapOpen, setMapOpen] = useState(false);
 
   function pickPlace(place: Place) {
@@ -31,14 +44,13 @@ export function SiteForm({ lat, lon, model, placeLabel, loading, onSubmit, onRef
   return (
     <div className="site-form">
       <PlaceSearch disabled={loading} model={model} onPick={pickPlace} />
-      <p className="place-chip">
-        {placeLabel ? <strong>{placeLabel}</strong> : null}
-        <span>
-          {lat.toFixed(4)}°N {lon.toFixed(4)}°E
-        </span>
-      </p>
       <div className="site-form-actions">
-        <FavoritesMenu lat={lat} lon={lon} label={placeLabel} onPick={pickFavorite} />
+        <FavoritesMenu
+          list={favs}
+          currentKey={`${lat.toFixed(4)},${lon.toFixed(4)}`}
+          onPick={pickFavorite}
+          onRemove={onFavoriteRemove}
+        />
         <button
           type="button"
           className="btn"
@@ -50,14 +62,16 @@ export function SiteForm({ lat, lon, model, placeLabel, loading, onSubmit, onRef
         <button type="button" className="btn" disabled={loading} onClick={onRefresh}>
           Refresh
         </button>
-        <button
-          type="button"
-          className="btn ghost"
-          disabled={loading}
-          onClick={() => onSubmit(DEMO_POINT.lat, DEMO_POINT.lon, DEMO_POINT.label)}
-        >
-          {DEMO_POINT.label}
-        </button>
+      </div>
+      <div className="site-form-secondary">
+        <label className="pick pick-check" title="Stack several places on one page">
+          <input
+            type="checkbox"
+            checked={compare}
+            onChange={(e) => onCompareChange(e.target.checked)}
+          />
+          Compare places
+        </label>
       </div>
       {mapOpen ? (
         <MapPicker

@@ -112,7 +112,7 @@ export function resolveWindow(nowMs: number = Date.now(), days = 3): TimeWindow 
 }
 
 export function roundPoint(lat: number, lon: number): [number, number] {
-  const r = (v: number): number => Number((Math.round(v / 0.01) * 0.01).toFixed(4));
+  const r = (v: number): number => Number((Math.round(v / 0.001) * 0.001).toFixed(4));
   return [r(lat), r(lon)];
 }
 

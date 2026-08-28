@@ -52,6 +52,43 @@ export type FetchAromeOpts = {
   signal?: AbortSignal;
 };
 
+// identical concurrent requests share one in-flight Open-Meteo call; the call
+// is only cancelled once every caller has aborted
+type Inflight = {
+  aborted: boolean;
+  join(signal: AbortSignal | undefined): Promise<AromeResponse>;
+};
+
+const inflight = new Map<string, Inflight>();
+
+function makeInflight(
+  run: (signal: AbortSignal) => Promise<AromeResponse>,
+): Inflight {
+  const controller = new AbortController();
+  const listeners = new Map<AbortSignal, () => void>();
+  const promise = run(controller.signal).finally(() => {
+    for (const [signal, fn] of listeners) signal.removeEventListener("abort", fn);
+    listeners.clear();
+  });
+  return {
+    get aborted() {
+      return controller.signal.aborted;
+    },
+    join(signal) {
+      if (signal && !signal.aborted) {
+        const onAbort = () => {
+          listeners.delete(signal);
+          signal.removeEventListener("abort", onAbort);
+          if (listeners.size === 0) controller.abort();
+        };
+        listeners.set(signal, onAbort);
+        signal.addEventListener("abort", onAbort);
+      }
+      return promise;
+    },
+  };
+}
+
 export async function fetchArome(
   lat: number,
   lon: number,
@@ -65,28 +102,46 @@ export async function fetchArome(
   const slot = cacheSlotUtc(Date.now(), model.slotHours);
   const window = resolveWindow(Date.now(), model.days);
   const [rlat, rlon] = roundPoint(lat, lon);
-  const key = `${model.id}|${rlat.toFixed(2)}_${rlon.toFixed(2)}|${slot}|${window.fromISO}|${window.toISO}`;
+  const key = `${model.id}|${rlat.toFixed(3)}_${rlon.toFixed(3)}|${slot}|${window.fromISO}|${window.toISO}`;
 
   if (!opts.force) {
     const cached = readPointCache(key, slot, window.fromISO, window.toISO);
     if (cached) return cached;
   }
 
-  let raw;
-  try {
-    raw = await fetchOpenMeteo(lat, lon, model, { signal: opts.signal });
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
-    if (
-      err instanceof OpenMeteoError &&
-      err.message.includes(NO_DATA_REASON)
-    ) {
-      throw new ApiError(noDataMessage(model), 400);
-    }
-    throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err), 502);
+  const inflightKey = `${opts.force ? "force" : "cached"}|${key}`;
+  const existing = inflight.get(inflightKey);
+  if (existing && !existing.aborted) {
+    return existing.join(opts.signal);
   }
+  if (existing) inflight.delete(inflightKey);
 
-  const payload = assembleResponse(lat, lon, model, raw, slot, window);
-  writePointCache(key, slot, window.fromISO, window.toISO, payload);
-  return payload;
+  const request = (signal: AbortSignal): Promise<AromeResponse> =>
+    (async () => {
+      try {
+        let raw;
+        try {
+          raw = await fetchOpenMeteo(lat, lon, model, { signal });
+        } catch (err: unknown) {
+          if (err instanceof DOMException && err.name === "AbortError") throw err;
+          if (
+            err instanceof OpenMeteoError &&
+            err.message.includes(NO_DATA_REASON)
+          ) {
+            throw new ApiError(noDataMessage(model), 400);
+          }
+          throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err), 502);
+        }
+
+        const payload = assembleResponse(lat, lon, model, raw, slot, window);
+        writePointCache(key, slot, window.fromISO, window.toISO, payload);
+        return payload;
+      } finally {
+        inflight.delete(inflightKey);
+      }
+    })();
+
+  const entry = makeInflight(request);
+  inflight.set(inflightKey, entry);
+  return entry.join(opts.signal);
 }
