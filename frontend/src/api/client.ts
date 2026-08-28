@@ -1,4 +1,8 @@
+import { readPointCache, writePointCache } from "./cache";
+import { assembleResponse, cacheSlotUtc, resolveWindow, roundPoint } from "./pipeline";
+import { fetchOpenMeteo } from "./openmeteo";
 import type { AromeResponse } from "./types";
+import { inAromeDomain } from "../lib/geocode";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -20,48 +24,36 @@ export async function fetchArome(
   lon: number,
   opts: FetchAromeOpts = {},
 ): Promise<AromeResponse> {
-  const params = new URLSearchParams({
-    lat: String(lat),
-    lon: String(lon),
-  });
-  if (opts.force) params.set("force", "true");
-
-  const res = await fetch(`/arome?${params.toString()}`, { signal: opts.signal });
-  if (!res.ok) {
-    throw new ApiError(await readDetail(res), res.status);
+  if (!inAromeDomain(lat, lon)) {
+    throw new ApiError(
+      "Point hors domaine AROME (lat 37.5–55.4 N, lon 12 W–16 E).",
+      400,
+    );
   }
-  const payload: unknown = await res.json();
-  if (!isAromeResponse(payload)) {
-    throw new ApiError("Réponse API inattendue", res.status);
-  }
-  return payload;
-}
+  const slot = cacheSlotUtc();
+  const window = resolveWindow();
+  const [rlat, rlon] = roundPoint(lat, lon);
+  const key = `${rlat.toFixed(2)}_${rlon.toFixed(2)}|${slot}|${window.fromISO}|${window.toISO}`;
 
-async function readDetail(res: Response): Promise<string> {
+  if (!opts.force) {
+    const cached = readPointCache(key, slot, window.fromISO, window.toISO);
+    if (cached) return cached;
+  }
+
+  let raw;
   try {
-    const body: unknown = await res.json();
-    if (body && typeof body === "object" && "detail" in body) {
-      const detail = (body as { detail: unknown }).detail;
-      if (typeof detail === "string" && detail.trim()) return detail;
-      if (Array.isArray(detail)) {
-        return detail
-          .map((item) => {
-            if (item && typeof item === "object" && "msg" in item) {
-              return String((item as { msg: unknown }).msg);
-            }
-            return String(item);
-          })
-          .join(" · ");
-      }
-    }
-  } catch {
-    /* corps non JSON */
+    raw = await fetchOpenMeteo(lat, lon, { signal: opts.signal });
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw err instanceof ApiError
+      ? err
+      : new ApiError(
+          err instanceof Error ? err.message : "Appel Open-Meteo impossible",
+          502,
+        );
   }
-  return `Erreur ${res.status}`;
-}
 
-function isAromeResponse(value: unknown): value is AromeResponse {
-  if (!value || typeof value !== "object") return false;
-  const rec = value as Record<string, unknown>;
-  return Array.isArray(rec.hours) && typeof rec.model === "string";
+  const payload = assembleResponse(lat, lon, raw, slot, window);
+  writePointCache(key, slot, window.fromISO, window.toISO, payload);
+  return payload;
 }

@@ -1,16 +1,4 @@
 .env
-.venv/
-venv/
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.coverage
-htmlcov/
-data/
-*.grib
-*.grib2
-*.idx
 .DS_Store
 Thumbs.db
 node_modules/

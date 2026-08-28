@@ -121,8 +121,8 @@ export default function App() {
         <div className="banner error" role="alert">
           {error}
           <span>
-            L’API doit tourner sur :8000 (proxy Vite <code>/arome</code>).{" "}
-            <code>backend\serve.cmd</code>
+            Appel direct <code>api.open-meteo.com</code> — vérifier la connexion ou
+            réessayer.
           </span>
         </div>
       ) : null}
