@@ -17,23 +17,23 @@ export class ApiError extends Error {
 function friendlyMessage(err: unknown): string {
   if (err instanceof OpenMeteoError && err.status === 429) {
     return (
-      "Limite d'Open-Meteo atteinte pour ta connexion. " +
-      "L'appli interroge directement ce service gratuit, dont le quota est " +
-      "compté par utilisateur et se renouvelle avec le temps. " +
-      "Le cache local limite déjà les appels : réessaie dans quelques minutes."
+      "Open-Meteo rate limit reached for your connection. " +
+      "The app queries this free service directly; its quota is counted " +
+      "per user and renews over time. The local cache already limits " +
+      "calls — try again in a few minutes."
     );
   }
   if (err instanceof OpenMeteoError && err.status >= 500) {
     return (
-      "Open-Meteo est momentanément indisponible. " +
-      "Réessaie dans un instant, les données devraient revenir."
+      "Open-Meteo is temporarily unavailable. " +
+      "Try again in a moment — the data should come back."
     );
   }
   if (err instanceof OpenMeteoError) {
     return err.message;
   }
   if (err instanceof Error && err.message.includes("fetch")) {
-    return "Impossible de joindre Open-Meteo — vérifier ta connexion internet.";
+    return "Could not reach Open-Meteo — check your internet connection.";
   }
   return err instanceof Error && err.message
     ? err.message

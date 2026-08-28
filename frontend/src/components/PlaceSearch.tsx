@@ -84,11 +84,11 @@ export function PlaceSearch({ disabled, onPick }: Props) {
   return (
     <div className="place-search" ref={boxRef}>
       <label className="place-search-field">
-        Lieu
+        Place
         <input
           id="place"
           type="search"
-          placeholder="Chamonix, Annecy, Puy de Dôme…"
+          placeholder="Search a place — Chamonix, Annecy…"
           autoComplete="off"
           spellCheck={false}
           value={query}
@@ -107,13 +107,13 @@ export function PlaceSearch({ disabled, onPick }: Props) {
       {showMenu ? (
         <ul className="place-menu" id="place-results" role="listbox">
           {searching && results.length === 0 ? (
-            <li className="place-empty">Recherche…</li>
+            <li className="place-empty">Searching…</li>
           ) : null}
           {!searching && failed ? (
-            <li className="place-empty">Recherche indisponible.</li>
+            <li className="place-empty">Search unavailable.</li>
           ) : null}
           {!searching && !failed && results.length === 0 ? (
-            <li className="place-empty">Aucun résultat.</li>
+            <li className="place-empty">No results.</li>
           ) : null}
           {results.map((place, i) => (
             <li key={`${place.lat},${place.lon},${i}`} role="none">

@@ -21,6 +21,10 @@ const COMPASS = [
 
 export const DEMO_POINT = { lat: 45.945, lon: 6.71, label: "Aravis" } as const;
 
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
 export function parseCoord(raw: string): number | null {
   const n = Number(raw.trim().replace(",", "."));
   return Number.isFinite(n) ? n : null;
@@ -50,20 +54,20 @@ export function fmtPrecip(v: number | null | undefined): string {
 }
 
 export function hourLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString("fr-FR", {
+  return new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Paris",
   });
 }
 
-export function hourShort(iso: string): string {
-  const raw = new Date(iso).toLocaleTimeString("fr-FR", {
+export function hourShort(iso: string): string {  const raw = new Date(iso).toLocaleTimeString("en-GB", {
     hour: "numeric",
     hour12: false,
     timeZone: "Europe/Paris",
   });
-  return `${Number.parseInt(raw, 10)}h`;
+  const h = Number.parseInt(raw, 10);
+  return `${pad(h)}:00`;
 }
 
 export function hourOfDay(iso: string): number {
@@ -100,7 +104,7 @@ export function slotsForDay(hours: Hour[]): HourSlot[] {
   }
   return DISPLAY_HOURS.map((hour) => ({
     hour,
-    label: `${hour}h`,
+    label: `${pad(hour)}:00`,
     data: byHour.get(hour) ?? null,
   }));
 }
@@ -124,7 +128,7 @@ export function groupByDay(hours: Hour[]): { key: string; label: string; hours: 
 }
 
 export function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-FR", {
+  return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -133,13 +137,13 @@ export function dayLabel(iso: string): string {
 }
 
 export function dayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-CA", { timeZone: "Europe/Paris" });
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
 }
 
 export function utcSlot(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("fr-FR", {
+  return d.toLocaleString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "UTC",

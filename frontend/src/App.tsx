@@ -67,7 +67,7 @@ export default function App() {
         const message =
           err instanceof Error && err.message
             ? err.message
-            : "Impossible de récupérer les données.";
+            : "Could not fetch data.";
         setError(message);
       })
       .finally(() => {
@@ -102,7 +102,7 @@ export default function App() {
       <header className="top">
         <div className="brand">
           <h1>AROME</h1>
-          <p>Windgram 0,025° · T, Td, vent · Météo-France via Open-Meteo</p>
+          <p>Windgram 0.025° · T, Td, wind · Météo-France via Open-Meteo</p>
         </div>
         <SiteForm
           lat={point.lat}
@@ -124,13 +124,13 @@ export default function App() {
         <div className="banner error" role="alert">
           <span>{error}</span>
           <button type="button" className="btn" onClick={refresh}>
-            Réessayer
+            Retry
           </button>
         </div>
       ) : null}
 
-      {loading && !data ? <div className="banner">Extraction du profil…</div> : null}
-      {loading && data ? <div className="banner">Mise à jour…</div> : null}
+      {loading && !data ? <div className="banner">Extracting profile…</div> : null}
+      {loading && data ? <div className="banner">Updating…</div> : null}
 
       {data ? (
         <>
@@ -139,9 +139,9 @@ export default function App() {
               {data.lat.toFixed(3)}°N {data.lon.toFixed(3)}°E
             </span>
             <span>
-              cellule {data.nearestCell.lat.toFixed(3)}, {data.nearestCell.lon.toFixed(3)}
+              cell {data.nearestCell.lat.toFixed(3)}, {data.nearestCell.lon.toFixed(3)}
             </span>
-            <span>alt. modèle {data.modelElevationM}&nbsp;m</span>
+            <span>model alt. {data.modelElevationM}&nbsp;m</span>
             <span>
               {data.model} {data.grid}° · {data.openMeteoModel ?? data.source}
             </span>
@@ -149,7 +149,7 @@ export default function App() {
           </p>
 
           <div className="toolbar">
-            <div className="seg" role="tablist" aria-label="Jour">
+            <div className="seg" role="tablist" aria-label="Day">
               {days.map((d) => (
                 <button
                   key={d.key}
@@ -163,7 +163,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="seg" role="tablist" aria-label="Vue">
+            <div className="seg" role="tablist" aria-label="View">
               <button
                 type="button"
                 className={view === "windgram" ? "is-on" : undefined}
@@ -176,11 +176,11 @@ export default function App() {
                 className={view === "sondage" ? "is-on" : undefined}
                 onClick={() => setView("sondage")}
               >
-                Sondage
+                Sounding
               </button>
             </div>
             {view === "windgram" ? (
-              <div className="seg" role="tablist" aria-label="Plafond">
+              <div className="seg" role="tablist" aria-label="Ceiling">
                 <button
                   type="button"
                   className={zMax === 4000 ? "is-on" : undefined}
@@ -198,7 +198,7 @@ export default function App() {
               </div>
             ) : (
               <label className="hour-pick">
-                Heure
+                Hour
                 <select
                   value={hour?.time ?? ""}
                   onChange={(e) => {
@@ -230,11 +230,11 @@ export default function App() {
             </>
           ) : null}
 
-          <p className="hint-keys">Grille 250 m AMSL interpolée entre niveaux AROME</p>
+          <p className="hint-keys">250 m AMSL grid interpolated between AROME levels</p>
 
           {data.warnings.length > 0 ? (
             <details className="notes">
-              <summary>Notes données</summary>
+              <summary>Data notes</summary>
               <ul>
                 {data.warnings.map((w) => (
                   <li key={w}>{w}</li>

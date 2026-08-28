@@ -7,9 +7,9 @@ export const CLOUD_BASE_RH = 90;
 export const CLOUD_BASE_FRACT = 50;
 
 export const CLOUD_BASE_RULE =
-  `cloudBaseM = AMSL du premier niveau du profil (z croissant) où ` +
-  `HU >= ${CLOUD_BASE_RH} % ou CLD_FRACT >= ${CLOUD_BASE_FRACT} % ; ` +
-  "null sinon. Aucune interpolation.";
+  `cloudBaseM = AMSL of the first profile level (z ascending) where ` +
+  `RH >= ${CLOUD_BASE_RH} % or CLD_FRACT >= ${CLOUD_BASE_FRACT} %; ` +
+  "null otherwise. No interpolation.";
 
 const PARIS = "Europe/Paris";
 
@@ -235,9 +235,9 @@ export function assembleResponse(
   const elev = num(raw.elevation) ?? 0;
   const [rlat, rlon] = roundPoint(lat, lon);
   const warnings = [
-    "source=open-meteo models=arome_france (0.025°). Pas de seamless, pas de HD, pas d'ARPEGE.",
-    "runInitUtc = slot cache 3 h Open-Meteo, pas l'heure d'init du run Météo-France.",
-    "Td isobare : Open-Meteo le dérive de T+HU. Td AGL hors 2 m : null (non publié).",
+    "source=open-meteo models=arome_france (0.025°). No seamless, no HD, no ARPEGE.",
+    "runInitUtc = Open-Meteo 3 h cache slot, not the Météo-France run init time.",
+    "Isobaric Td: derived by Open-Meteo from T+RH. AGL Td beyond 2 m: null (not published).",
     CLOUD_BASE_RULE,
   ];
 
@@ -275,7 +275,7 @@ export function assembleResponse(
     warnings,
     cloudBaseRule: CLOUD_BASE_RULE,
     attribution:
-      "Données Météo-France AROME via Open-Meteo (CC BY 4.0). " +
+      "Météo-France AROME data via Open-Meteo (CC BY 4.0). " +
       "Licence Ouverte 2.0 / Météo-France. " +
       "https://open-meteo.com/en/licence",
   };

@@ -66,7 +66,7 @@ export async function searchPlaces(
     `${AROME_DOMAIN.lonMin},${AROME_DOMAIN.latMin},${AROME_DOMAIN.lonMax},${AROME_DOMAIN.latMax}`,
   );
   const res = await fetch(url.toString(), { signal });
-  if (!res.ok) throw new Error(`Recherche indisponible (${res.status}).`);
+  if (!res.ok) throw new Error(`Search unavailable (${res.status}).`);
   const payload = (await res.json()) as { features?: PhotonFeature[] };
   const places: Place[] = [];
   for (const f of payload.features ?? []) {

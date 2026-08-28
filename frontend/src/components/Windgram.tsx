@@ -208,8 +208,8 @@ function EmptyBand({
   return (
     <td
       className="empty"
-      onMouseEnter={(e) => onTip("hors prévision", e)}
-      onMouseMove={(e) => onTip("hors prévision", e)}
+      onMouseEnter={(e) => onTip("out of forecast", e)}
+      onMouseMove={(e) => onTip("out of forecast", e)}
       onMouseLeave={() => onTip(null)}
     />
   );
@@ -230,8 +230,8 @@ function WindCell({
     return (
       <td
         className="cell empty"
-        onMouseEnter={(e) => onTip("hors prévision", e)}
-        onMouseMove={(e) => onTip("hors prévision", e)}
+        onMouseEnter={(e) => onTip("out of forecast", e)}
+        onMouseMove={(e) => onTip("out of forecast", e)}
         onMouseLeave={() => onTip(null)}
       />
     );

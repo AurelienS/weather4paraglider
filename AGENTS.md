@@ -1,78 +1,78 @@
 # AGENTS.md — Météo parapente
 
-Application 100 % front : Vite + React 19 + TypeScript. Aucun backend.
-Les données AROME 0.025° (Météo-France) sont récupérées directement depuis le
-navigateur via l'API publique Open-Meteo ; le cache des points vit dans le
-`localStorage` de chaque utilisateur (slot 3 h). Déployable en statique
-(`frontend/dist/`).
+Frontend-only app: Vite + React 19 + TypeScript. No backend.
+AROME 0.025° data (Météo-France) is fetched directly from the browser through
+the public Open-Meteo API; the point cache lives in each user's `localStorage`
+(3 h slot). Deployable as static files (`frontend/dist/`).
 
-## Commandes
+## Commands
 
 ```text
 cd frontend
-npm run dev       # serveur de dev sur http://127.0.0.1:5173
+npm run dev       # dev server on http://127.0.0.1:5173
 npm run build     # tsc -b && vite build
 npm run lint      # oxlint
-npm run e2e       # build + tests Playwright (headless, sans réseau réel)
+npm run e2e       # build + Playwright tests (headless, no real network)
 ```
 
-## Règle : toute feature doit être testée
+## Rule: every feature must be tested
 
-Un travail n'est pas terminé tant qu'il n'est pas couvert par des tests.
-Aucun commit avec `npm run lint`, `npm run build` ou `npm run e2e` en échec.
+Work is not done until it is covered by tests.
+Never commit with failing `npm run lint`, `npm run build` or `npm run e2e`.
 
-### E2E (obligatoire pour toute feature visible par l'utilisateur)
+### E2E (mandatory for any user-visible feature)
 
-- Localisation : `frontend/e2e/*.spec.ts`, config `frontend/playwright.config.ts`.
-- Runner : `@playwright/test`, serveur `vite preview` démarré automatiquement
-  par la config (build de production, pas le serveur de dev).
-- Toute feature qui touche l'interface (formulaire de lieu, carte, favoris,
-  affichage météo, gestion d'erreurs, cache…) doit avoir au moins un test e2e
-  qui vérifie le comportement **vu par l'utilisateur** : URL mise à jour,
-  textes affichés, éléments rendus, interactions clavier/souris.
-- Réseau : **ne jamais dépendre d'un service réel dans les tests.**
-  Utiliser les helpers de `frontend/e2e/mock.ts` :
-  - `mockOpenMeteo(page)` — payload AROME généré dynamiquement (72 h depuis
-    la date du jour en Europe/Paris), donc déterministe toute l'année ;
-    options `status` pour simuler 429/5xx.
-  - `mockPhoton(page)` — géocodage / reverse-geocoding.
-  - `blockTiles(page)` — à appeler dans `beforeEach` (tuiles OSM bloquées).
-- Compter les appels (`const om = await mockOpenMeteo(page)` puis `om.calls()`)
-  pour tester le cache et le forçage.
-- Chaque test démarre avec un contexte neuf (localStorage vide) : ne pas
-  dépendre de l'état d'un autre test.
+- Location: `frontend/e2e/*.spec.ts`, config `frontend/playwright.config.ts`.
+- Runner: `@playwright/test`, with a `vite preview` server started
+  automatically by the config (production build, not the dev server).
+- Any feature touching the UI (place form, map, favorites, weather display,
+  error handling, cache…) must have at least one e2e test asserting the
+  **user-visible behavior**: URL updates, displayed texts, rendered elements,
+  keyboard/mouse interactions.
+- Network: **never depend on a real service in tests.** Use the helpers from
+  `frontend/e2e/mock.ts`:
+  - `mockOpenMeteo(page)` — AROME payload generated dynamically (72 h from
+    today's date in Europe/Paris), so it stays deterministic all year;
+    `status` option to simulate 429/5xx.
+  - `mockPhoton(page)` — geocoding / reverse geocoding.
+  - `blockTiles(page)` — call it in `beforeEach` (OSM tiles blocked).
+- Count calls (`const om = await mockOpenMeteo(page)` then `om.calls()`) to
+  test caching and forcing.
+- Each test starts with a fresh context (empty localStorage): do not rely on
+  another test's state.
 
-### Tests unitaires (logique pure)
+### Unit tests (pure logic)
 
-- La logique non triviale et pure (parsing, maths, fusion de profil,
-  gestion de fenêtre horaire…) doit vivre dans des fonctions testables
-  (`src/lib/`, `src/api/`) et être couverte par des tests unitaires
-  (framework : Vitest, à installer avec `npm i -D vitest` si absent).
-- Les composants React restent couverts par les e2e ; ne pas chercher à
-  les tester unitairement sauf logique interne complexe.
+- Non-trivial pure logic (parsing, math, profile fusion, time-window
+  handling…) must live in testable functions (`src/lib/`, `src/api/`) and be
+  covered by unit tests (framework: Vitest — install with
+  `npm i -D vitest` if absent).
+- React components stay covered by e2e; do not unit-test them unless they
+  contain complex internal logic.
 
-## Conventions du projet
+## Project conventions
 
-- Tout en français : interface, messages d'erreur, tests, commits.
-- Messages d'erreur : toujours compréhensibles par un utilisateur non
-  technique (`friendlyMessage` dans `frontend/src/api/client.ts`), en
-  expliquant le fonctionnement (quota Open-Meteo par utilisateur, cache
-  local, etc.).
-- Clés `localStorage` préfixées `w4p.` (ex. `w4p.favorites.v1`,
-  `w4p.arome.cache.v1`) avec suffixe de version.
-- Constantes du domaine AROME : lat 37.5–55.4, lon −12→16
-  (`AROME_DOMAIN` dans `frontend/src/lib/geocode.ts`).
-- Horaires : stockés avec offset Europe/Paris (`2026-08-28T07:00:00+02:00`) ;
-  toute la gestion murale Paris est centralisée dans `frontend/src/api/pipeline.ts`.
-- Après modification de données : bump la version des clés de cache si le
-  format change.
+- Everything in English: UI, error messages, tests, commits, docs. French
+  place names stay French ("Chamonix-Mont-Blanc", "Puy de Dôme"…).
+- Error messages must be understandable by non-technical users
+  (`friendlyMessage` in `frontend/src/api/client.ts`), explaining how things
+  work (per-user Open-Meteo quota, local cache, etc.).
+- `localStorage` keys prefixed `w4p.` (e.g. `w4p.favorites.v1`,
+  `w4p.arome.cache.v1`) with a version suffix.
+- AROME domain constants: lat 37.5–55.4, lon −12→16
+  (`AROME_DOMAIN` in `frontend/src/lib/geocode.ts`).
+- Times are stored with the Europe/Paris offset
+  (`2026-08-28T07:00:00+02:00`); all Paris wall-clock handling lives in
+  `frontend/src/api/pipeline.ts`.
+- After changing data shapes: bump the cache-key version if the format
+  changes.
 
-## Structure
+## Layout
 
 ```text
 frontend/
-  src/api/        client Open-Meteo, pipeline (portage du profil Stüve), cache localStorage
+  src/api/        Open-Meteo client, pipeline (Stüve profile port), localStorage cache
   src/components/ SiteForm, PlaceSearch, MapPicker, FavoritesMenu, Windgram, Sounding…
-  src/lib/        format/affichage, géocodage, favoris
-  e2e/            specs Playwright + helpers de mock
+  src/lib/        display/format helpers, geocoding, favorites
+  e2e/            Playwright specs + mock helpers
 ```

@@ -60,7 +60,7 @@ export function FavoritesMenu({ lat, lon, label, onPick }: Props) {
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
       >
-        Favoris ({list.length})
+        Favorites ({list.length})
       </button>
       {open ? (
         <ul className="fav-list" role="menu">
@@ -72,7 +72,7 @@ export function FavoritesMenu({ lat, lon, label, onPick }: Props) {
               disabled={alreadySaved}
               onClick={addCurrent}
             >
-              {alreadySaved ? "Lieu actuel déjà enregistré" : "Ajouter le lieu actuel"}
+              {alreadySaved ? "Current place already saved" : "Add current place"}
             </button>
           </li>
           {list.map((fav) => (
@@ -95,7 +95,7 @@ export function FavoritesMenu({ lat, lon, label, onPick }: Props) {
               <button
                 type="button"
                 className="fav-remove"
-                aria-label={`Retirer ${fav.label} des favoris`}
+                aria-label={`Remove ${fav.label} from favorites`}
                 onClick={() => remove(fav)}
               >
                 ×
@@ -103,7 +103,7 @@ export function FavoritesMenu({ lat, lon, label, onPick }: Props) {
             </li>
           ))}
           {list.length === 0 ? (
-            <li className="fav-empty">Aucun favori enregistré.</li>
+            <li className="fav-empty">No favorites saved.</li>
           ) : null}
         </ul>
       ) : null}

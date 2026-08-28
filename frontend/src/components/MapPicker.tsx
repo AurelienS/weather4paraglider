@@ -134,17 +134,17 @@ export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
       className="map-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Choisir un point sur la carte"
+      aria-label="Pick a point on the map"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div className="map-panel">
         <div className="map-panel-head">
-          <strong>Choisir un point</strong>
-          <span className="map-hint">Clic ou glisser sur la carte, Échap pour fermer</span>
+          <strong>Pick a point</strong>
+          <span className="map-hint">Click or drag on the map — Esc to close</span>
           <button type="button" className="btn" onClick={onCancel}>
-            Fermer
+            Close
           </button>
         </div>
         <div className="map-holder" ref={holderRef} />
@@ -173,13 +173,13 @@ export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
               onChange={(e) => setLonDraft(e.target.value)}
               onBlur={commitCoords}
             />
-            <button type="submit" className="btn" aria-label="Appliquer les coordonnées">
+            <button type="submit" className="btn" aria-label="Apply coordinates">
               OK
             </button>
           </form>
           <span className="map-spacer" />
           {!valid ? (
-            <span className="map-domain-warn">Hors domaine AROME</span>
+            <span className="map-domain-warn">Out of AROME domain</span>
           ) : null}
           <button
             type="button"
@@ -187,7 +187,7 @@ export function MapPicker({ lat, lon, onCancel, onPick }: Props) {
             disabled={!valid}
             onClick={() => onPick(pos.lat, pos.lon, near)}
           >
-            Utiliser ce point
+            Use this point
           </button>
         </div>
       </div>

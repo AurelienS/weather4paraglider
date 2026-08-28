@@ -100,7 +100,7 @@ export async function fetchOpenMeteo(
   const payload = (await res.json()) as OpenMeteoRaw;
   if (payload.error) {
     throw new OpenMeteoError(
-      String(payload.reason ?? "Réponse Open-Meteo en erreur"),
+      String(payload.reason ?? "Open-Meteo returned an error response"),
       502,
     );
   }

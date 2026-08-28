@@ -1,12 +1,14 @@
 # Météo parapente
 
-Application 100 % front — Vite + React + TypeScript. Profil AROME 0.025°
-(Météo-France) via l'API publique Open-Meteo, appelée directement depuis le
-navigateur. Cache des points dans le `localStorage` (slot 3 h).
+Frontend-only app — Vite + React 19 + TypeScript. No backend.
+AROME 0.025° data (Météo-France) is fetched directly from the browser through
+the public Open-Meteo API; the point cache lives in each user's `localStorage`
+(3 h slot). Deployable as static files (`frontend/dist/`).
 
-Windgram T/Td + vent, sondage Stüve, recherche de lieu, carte, favoris.
+Features: T/Td + wind windgram, Stüve sounding, place search, map picker,
+favorites.
 
-## Dev
+## Development
 
 ```text
 cd frontend
@@ -16,7 +18,7 @@ npm run dev
 
 http://127.0.0.1:5173/?lat=45.945&lon=6.71
 
-## Build statique
+## Static build
 
 ```text
 cd frontend
@@ -24,16 +26,16 @@ npm run build
 npm run preview
 ```
 
-## Tests e2e (Playwright)
+## E2E tests (Playwright)
 
-API Open-Meteo et géocodage mockés : les tests sont déterministes, sans réseau
-(tuiles OSM bloquées).
+Open-Meteo and geocoding are mocked: tests are deterministic and need no
+network access (OSM tiles blocked).
 
 ```text
 cd frontend
 npm run e2e
 ```
 
-Aucun backend : le dossier `dist/` est déployable sur n'importe quel
-hébergement statique. Données : Météo-France AROME via Open-Meteo (CC BY 4.0),
-quota Open-Meteo consommé par visiteur (par IP).
+No backend: the `dist/` folder can be hosted on any static hosting.
+Data: Météo-France AROME via Open-Meteo (CC BY 4.0); the Open-Meteo quota is
+consumed per visitor (per IP).

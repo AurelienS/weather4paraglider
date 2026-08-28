@@ -38,7 +38,7 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
         className="sounding"
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         role="img"
-        aria-label="Sondage T, Td et vent. Verticale = adiabatique sèche."
+        aria-label="Sounding: T, Td and wind. Vertical axis = dry adiabat."
         onMouseMove={onMove}
         onMouseLeave={() => onActiveZ(null)}
       >
@@ -125,7 +125,7 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
             </text>
           ) : null}
           <text x={PAD.left + 6} y={PAD.top + 14} className="anno">
-            ← instable
+            ← unstable
           </text>
           <text x={layout.tempRight - 6} y={PAD.top + 14} className="anno" textAnchor="end">
             stable →
@@ -176,10 +176,10 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
         ) : null}
 
         <text x={PAD.left} y={18} className="axis-title">
-          T / Td · verticale = γd 9,8 K/km
+          T / Td · vertical = γd 9.8 K/km
         </text>
         <text x={layout.windLeft} y={18} className="axis-title">
-          Vent (km/h)
+          Wind (km/h)
         </text>
         <text x={PAD.left - 8} y={PAD.top - 8} className="axis-title" textAnchor="end">
           m
@@ -190,17 +190,17 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
 
       <ul className="legend">
         <li>
-          <i className="swatch t" /> T air
+          <i className="swatch t" /> air T
         </li>
         <li>
           <i className="swatch td" /> Td
         </li>
         <li>
-          <i className="swatch dalr" /> adiabatique sèche (verticale)
+          <i className="swatch dalr" /> dry adiabat (vertical)
         </li>
-        <li>penche à gauche = instable</li>
+        <li>leaning left = unstable</li>
         <li>
-          <i className="swatch wind" /> vent
+          <i className="swatch wind" /> wind
         </li>
       </ul>
     </div>
@@ -225,9 +225,9 @@ function HoverCard({ point, x, y }: { point: ProfilePoint; x: number; y: number 
         {spread ? ` · T−Td ${spread} K` : ""}
       </span>
       <span>
-        {point.wind == null ? "vent —" : `${point.wind} km/h ${compass(point.dir)}`}
-        {point.rh != null ? ` · HU ${point.rh}%` : ""}
-        {point.cloud != null ? ` · neb ${point.cloud}%` : ""}
+        {point.wind == null ? "wind —" : `${point.wind} km/h ${compass(point.dir)}`}
+        {point.rh != null ? ` · RH ${point.rh}%` : ""}
+        {point.cloud != null ? ` · cloud ${point.cloud}%` : ""}
       </span>
     </div>
   );

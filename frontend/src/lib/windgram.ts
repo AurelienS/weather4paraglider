@@ -12,7 +12,7 @@ export type GramCell = {
   td: number | null;
   rh: number | null;
   cloud: number | null;
-  /** Vitesse verticale estimée (m/s), 0 hors couche convective. */
+  /** Estimated vertical velocity (m/s), 0 outside the convective layer. */
   wMs: number;
 };
 
@@ -44,7 +44,7 @@ export function altitudeLevels(elevM: number, zMax: number, step = ALT_STEP_M): 
 }
 
 const DALR = 9.8;
-/** Holzworth modifié / NWP : θv,env = θv,sol + 0,5 K (AMT 2022, Coniglio 2013). */
+/** Modified Holzworth / NWP: theta_v,env = theta_v,ground + 0.5 K (AMT 2022, Coniglio 2013). */
 const LID_K = 0.5;
 
 export function sampleCell(
@@ -88,9 +88,9 @@ export function sampleCell(
 }
 
 /**
- * Holzworth modifié : parcelle sèche depuis Tv sol (γd 9,8 K/km) jusqu'à
- * θv,env = θv,sol + 0,5 K. Standard CBL opérationnel ; DrJack (vol à voile) :
- * le plafond planeur est un peu sous ce niveau.
+ * Modified Holzworth: dry parcel from ground Tv (gamma_d 9.8 K/km) up to
+ * theta_v,env = theta_v,ground + 0.5 K. Operational CBL standard; DrJack
+ * (soaring) puts the glider ceiling slightly below this level.
  */
 export function convectiveTop(hour: Hour, elevM: number): number | null {
   const profile = [...hour.profile].sort((a, b) => a.z - b.z);
@@ -161,8 +161,8 @@ export function cssRgb(rgb: RGB): string {
 }
 
 /**
- * Sous la LCL / dans la CBL sèche : pas de nuage (thermiques).
- * Au-dessus : champ isobare. Stratus sol seulement si pas de convection.
+ * Below the LCL / inside the dry CBL: no cloud (thermals).
+ * Above: isobaric field. Low stratus only when there is no convection.
  */
 function cloudAt(
   z: number,
@@ -191,7 +191,7 @@ function cloudAt(
   return round0(interpScalar(profile, z, (p) => p.cloud));
 }
 
-/** LCL AMSL : cloudBaseM, sinon ~125 m/K × (T−Td). */
+/** LCL AMSL: cloudBaseM, else ~125 m/K x (T-Td). */
 function condensationLevelM(hour: Hour, elevM: number): number | null {
   if (hour.surface.cloudBaseM != null) return hour.surface.cloudBaseM;
   const t = hour.surface.t2m ?? hour.profile[0]?.t ?? null;
@@ -210,8 +210,8 @@ function lowCloudFade(z: number, elevM: number, cloudLow: number | null): number
 }
 
 /**
- * w estimé (m/s) dans la CBL : 1.15 √(ΔT+0.4) × (h/800)^0.25
- * ΔT = T parcelle sèche − T env. Ce n'est pas un champ modèle.
+ * Estimated w (m/s) in the CBL: 1.15 sqrt(dT + 0.4) x (h / 800)^0.25
+ * dT = dry-parcel T - env T. Not a model field.
  */
 function thermalSpeed(
   hour: Hour,

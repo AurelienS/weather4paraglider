@@ -37,10 +37,10 @@ export function SiteForm({ lat, lon, placeLabel, loading, onSubmit, onRefresh }:
           disabled={loading}
           onClick={() => setMapOpen(true)}
         >
-          Carte…
+          Map…
         </button>
         <button type="button" className="btn" disabled={loading} onClick={onRefresh}>
-          Actualiser
+          Refresh
         </button>
         <button
           type="button"
