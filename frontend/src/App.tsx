@@ -19,8 +19,8 @@ type View = "windgram" | "sondage";
 
 function readPointFromUrl(): Point {
   const q = new URLSearchParams(window.location.search);
-  const lat = Number(q.get("lat"));
-  const lon = Number(q.get("lon"));
+  const lat = q.get("lat") == null ? NaN : Number(q.get("lat"));
+  const lon = q.get("lon") == null ? NaN : Number(q.get("lon"));
   if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
   return { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon };
 }
@@ -34,6 +34,7 @@ function writePointToUrl(point: Point) {
 
 export default function App() {
   const [point, setPoint] = useState<Point>(readPointFromUrl);
+  const [place, setPlace] = useState<string | null>(null);
   const [bump, setBump] = useState(0);
   const forceRef = useRef(false);
   const [data, setData] = useState<AromeResponse | null>(null);
@@ -96,14 +97,16 @@ export default function App() {
           <p>Windgram 0,025° · T, Td, vent · Météo-France via Open-Meteo</p>
         </div>
         <SiteForm
-          key={`${point.lat},${point.lon}`}
           lat={point.lat}
           lon={point.lon}
+          placeLabel={place}
           loading={loading}
-          onSubmit={(lat, lon) => {
+          onSubmit={(lat, lon, label) => {
             setLoading(true);
             setError(null);
-            setPoint({ lat, lon });
+            setPlace(label ?? null);
+            if (lat === point.lat && lon === point.lon) setBump((n) => n + 1);
+            else setPoint({ lat, lon });
           }}
           onRefresh={() => {
             setLoading(true);

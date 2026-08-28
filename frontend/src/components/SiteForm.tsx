@@ -1,80 +1,66 @@
-import { useState, type FormEvent } from "react";
-import { DEMO_POINT, parseCoord } from "../lib/format";
+import { useState } from "react";
+import { DEMO_POINT } from "../lib/format";
+import type { Place } from "../lib/geocode";
+import { MapPicker } from "./MapPicker";
+import { PlaceSearch } from "./PlaceSearch";
 
 type Props = {
   lat: number;
   lon: number;
+  placeLabel: string | null;
   loading: boolean;
-  onSubmit: (lat: number, lon: number) => void;
+  onSubmit: (lat: number, lon: number, label?: string | null) => void;
   onRefresh: () => void;
 };
 
-export function SiteForm({ lat, lon, loading, onSubmit, onRefresh }: Props) {
-  const [latText, setLatText] = useState(String(lat));
-  const [lonText, setLonText] = useState(String(lon));
-  const [hint, setHint] = useState<string | null>(null);
+export function SiteForm({ lat, lon, placeLabel, loading, onSubmit, onRefresh }: Props) {
+  const [mapOpen, setMapOpen] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    const nextLat = parseCoord(latText);
-    const nextLon = parseCoord(lonText);
-    if (nextLat == null || nextLon == null) {
-      setHint("Latitude / longitude numériques (virgule acceptée).");
-      return;
-    }
-    if (nextLat < 37.5 || nextLat > 55.4 || nextLon < -12 || nextLon > 16) {
-      setHint("Hors domaine AROME (37,5–55,4 N, 12 W–16 E).");
-      return;
-    }
-    setHint(null);
-    onSubmit(nextLat, nextLon);
-  }
-
-  function useDemo() {
-    setHint(null);
-    onSubmit(DEMO_POINT.lat, DEMO_POINT.lon);
+  function pickPlace(place: Place) {
+    onSubmit(place.lat, place.lon, `${place.label}, ${place.detail}`);
   }
 
   return (
-    <form className="site-form" onSubmit={handleSubmit}>
-      <label>
-        Latitude
-        <input
-          id="lat"
-          name="lat"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
-          value={latText}
-          disabled={loading}
-          onChange={(e) => setLatText(e.target.value)}
-        />
-      </label>
-      <label>
-        Longitude
-        <input
-          id="lon"
-          name="lon"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
-          value={lonText}
-          disabled={loading}
-          onChange={(e) => setLonText(e.target.value)}
-        />
-      </label>
+    <div className="site-form">
+      <PlaceSearch disabled={loading} onPick={pickPlace} />
       <div className="site-form-actions">
-        <button type="submit" className="btn primary" disabled={loading}>
-          {loading ? "Chargement…" : "Charger"}
+        <button
+          type="button"
+          className="btn"
+          disabled={loading}
+          onClick={() => setMapOpen(true)}
+        >
+          Carte…
         </button>
         <button type="button" className="btn" disabled={loading} onClick={onRefresh}>
           Actualiser
         </button>
-        <button type="button" className="btn ghost" disabled={loading} onClick={useDemo}>
+        <button
+          type="button"
+          className="btn ghost"
+          disabled={loading}
+          onClick={() => onSubmit(DEMO_POINT.lat, DEMO_POINT.lon, DEMO_POINT.label)}
+        >
           {DEMO_POINT.label}
         </button>
       </div>
-      {hint ? <p className="form-hint">{hint}</p> : null}
-    </form>
+      <p className="place-chip">
+        {placeLabel ? <strong>{placeLabel}</strong> : null}
+        <span>
+          {lat.toFixed(4)}°N {lon.toFixed(4)}°E
+        </span>
+      </p>
+      {mapOpen ? (
+        <MapPicker
+          lat={lat}
+          lon={lon}
+          onCancel={() => setMapOpen(false)}
+          onPick={(nextLat, nextLon, label) => {
+            setMapOpen(false);
+            onSubmit(nextLat, nextLon, label);
+          }}
+        />
+      ) : null}
+    </div>
   );
 }
