@@ -439,6 +439,13 @@ code {
   color: #f0c8c8;
 }
 
+.banner.error .btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  color: #f0c8c8;
+  border-color: #6a3333;
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;

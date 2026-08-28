@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, fetchArome } from "./api/client";
+import { fetchArome } from "./api/client";
 import type { AromeResponse } from "./api/types";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
@@ -65,9 +65,10 @@ export default function App() {
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         const message =
-          err instanceof ApiError ? err.message : "Impossible de joindre l’API.";
+          err instanceof Error && err.message
+            ? err.message
+            : "Impossible de récupérer les données.";
         setError(message);
-        setData(null);
       })
       .finally(() => {
         if (!ac.signal.aborted) setLoading(false);
@@ -89,6 +90,13 @@ export default function App() {
     if (idx >= 0) setHourIdx(idx);
   }
 
+  function refresh() {
+    setLoading(true);
+    setError(null);
+    forceRef.current = true;
+    setBump((n) => n + 1);
+  }
+
   return (
     <div className="app">
       <header className="top">
@@ -108,22 +116,16 @@ export default function App() {
             if (lat === point.lat && lon === point.lon) setBump((n) => n + 1);
             else setPoint({ lat, lon });
           }}
-          onRefresh={() => {
-            setLoading(true);
-            setError(null);
-            forceRef.current = true;
-            setBump((n) => n + 1);
-          }}
+          onRefresh={refresh}
         />
       </header>
 
       {error ? (
         <div className="banner error" role="alert">
-          {error}
-          <span>
-            Appel direct <code>api.open-meteo.com</code> — vérifier la connexion ou
-            réessayer.
-          </span>
+          <span>{error}</span>
+          <button type="button" className="btn" onClick={refresh}>
+            Réessayer
+          </button>
         </div>
       ) : null}
 

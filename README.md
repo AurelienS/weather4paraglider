@@ -24,6 +24,16 @@ npm run build
 npm run preview
 ```
 
+## Tests e2e (Playwright)
+
+API Open-Meteo et géocodage mockés : les tests sont déterministes, sans réseau
+(tuiles OSM bloquées).
+
+```text
+cd frontend
+npm run e2e
+```
+
 Aucun backend : le dossier `dist/` est déployable sur n'importe quel
 hébergement statique. Données : Météo-France AROME via Open-Meteo (CC BY 4.0),
 quota Open-Meteo consommé par visiteur (par IP).

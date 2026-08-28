@@ -1,6 +1,6 @@
 import { readPointCache, writePointCache } from "./cache";
 import { assembleResponse, cacheSlotUtc, resolveWindow, roundPoint } from "./pipeline";
-import { fetchOpenMeteo } from "./openmeteo";
+import { fetchOpenMeteo, OpenMeteoError } from "./openmeteo";
 import type { AromeResponse } from "./types";
 import { inAromeDomain } from "../lib/geocode";
 
@@ -12,6 +12,32 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+function friendlyMessage(err: unknown): string {
+  if (err instanceof OpenMeteoError && err.status === 429) {
+    return (
+      "Limite d'Open-Meteo atteinte pour ta connexion. " +
+      "L'appli interroge directement ce service gratuit, dont le quota est " +
+      "compté par utilisateur et se renouvelle avec le temps. " +
+      "Le cache local limite déjà les appels : réessaie dans quelques minutes."
+    );
+  }
+  if (err instanceof OpenMeteoError && err.status >= 500) {
+    return (
+      "Open-Meteo est momentanément indisponible. " +
+      "Réessaie dans un instant, les données devraient revenir."
+    );
+  }
+  if (err instanceof OpenMeteoError) {
+    return err.message;
+  }
+  if (err instanceof Error && err.message.includes("fetch")) {
+    return "Impossible de joindre Open-Meteo — vérifier ta connexion internet.";
+  }
+  return err instanceof Error && err.message
+    ? err.message
+    : "Une erreur inattendue est survenue.";
 }
 
 export type FetchAromeOpts = {
@@ -45,12 +71,7 @@ export async function fetchArome(
     raw = await fetchOpenMeteo(lat, lon, { signal: opts.signal });
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
-    throw err instanceof ApiError
-      ? err
-      : new ApiError(
-          err instanceof Error ? err.message : "Appel Open-Meteo impossible",
-          502,
-        );
+    throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err), 502);
   }
 
   const payload = assembleResponse(lat, lon, raw, slot, window);

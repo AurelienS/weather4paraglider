@@ -50,6 +50,29 @@ export function hourlyVars(): string[] {
   return vars;
 }
 
+export class OpenMeteoError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "OpenMeteoError";
+    this.status = status;
+  }
+}
+
+async function readReason(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const body = JSON.parse(text) as { reason?: unknown };
+    if (body && typeof body.reason === "string" && body.reason.trim()) {
+      return body.reason.trim();
+    }
+  } catch {
+    return text.slice(0, 200);
+  }
+  return text.slice(0, 200);
+}
+
 export async function fetchOpenMeteo(
   lat: number,
   lon: number,
@@ -69,12 +92,17 @@ export async function fetchOpenMeteo(
   });
   const res = await fetch(`${OM_URL}?${params.toString()}`, { signal: opts.signal });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Open-Meteo HTTP ${res.status} : ${text.slice(0, 200)}`);
+    throw new OpenMeteoError(
+      `Open-Meteo HTTP ${res.status} : ${(await readReason(res)) || res.statusText}`,
+      res.status,
+    );
   }
   const payload = (await res.json()) as OpenMeteoRaw;
   if (payload.error) {
-    throw new Error(String(payload.reason ?? "Réponse Open-Meteo en erreur"));
+    throw new OpenMeteoError(
+      String(payload.reason ?? "Réponse Open-Meteo en erreur"),
+      502,
+    );
   }
   return payload;
 }
