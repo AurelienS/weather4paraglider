@@ -1100,6 +1100,14 @@ code {
   font-size: 0.8rem;
 }
 
+.foot a {
+  color: var(--faint);
+}
+
+.foot a:hover {
+  color: var(--text);
+}
+
 @media (max-width: 720px) {
   .app {
     padding: 16px 12px 48px;
