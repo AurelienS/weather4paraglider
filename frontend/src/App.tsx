@@ -527,7 +527,24 @@ export default function App() {
             </details>
           ) : null}
 
-          <footer className="foot">{data.attribution}</footer>
+          <footer className="foot">
+            {data.attribution} ·{" "}
+            <a
+              href="https://github.com/AurelienS/weather4paraglider/blob/main/LICENSE"
+              target="_blank"
+              rel="noreferrer"
+            >
+              AGPL-3.0
+            </a>{" "}
+            ·{" "}
+            <a
+              href="https://github.com/AurelienS/weather4paraglider"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          </footer>
         </>
       ) : null}
     </div>

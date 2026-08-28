@@ -13,6 +13,14 @@ test("renders the AROME windgram for the URL point", async ({ page }) => {
   await expect(page.locator(".meta")).toContainText("model alt. 1696");
   await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(3);
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator(".foot a:has-text('GitHub')")).toHaveAttribute(
+    "href",
+    "https://github.com/AurelienS/weather4paraglider",
+  );
+  await expect(page.locator(".foot a:has-text('AGPL-3.0')")).toHaveAttribute(
+    "href",
+    "https://github.com/AurelienS/weather4paraglider/blob/main/LICENSE",
+  );
 });
 
 test("model selection switches the forecast window and URL", async ({ page }) => {

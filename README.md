@@ -95,3 +95,12 @@ restarts the services one by one.
 - The container is stateless: the point cache lives in each visitor's
   `localStorage`, so no Docker volume is needed.
 - Logs: `docker compose logs -f app` — Stop: `docker compose down`.
+
+## License
+
+Weather4Paragliding is licensed under the
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
+
+Copyleft: any fork or modified version — whether redistributed or hosted as a
+web service — must be released under the same license with its source code
+available.

@@ -314,7 +314,7 @@ export function assembleResponse(
           : model.family === "HARMONIE"
             ? "DMI HARMONIE AROME data via Open-Meteo (CC BY 4.0). https://open-meteo.com/en/licence"
             : "Météo-France data via Open-Meteo (CC BY 4.0). " +
-              "Licence Ouverte 2.0 / Météo-France. " +
+              "Météo-France data licensed under the Etalab Open Licence 2.0. " +
               "https://open-meteo.com/en/licence",
   };
 }
