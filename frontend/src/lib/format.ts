@@ -1,23 +1,21 @@
 import type { Hour } from "../api/types";
 
-const COMPASS = [
-  "N",
-  "NNE",
-  "NE",
-  "ENE",
-  "E",
-  "ESE",
-  "SE",
-  "SSE",
-  "S",
-  "SSO",
-  "SO",
-  "OSO",
-  "O",
-  "ONO",
-  "NO",
-  "NNO",
-] as const;
+import type { Lang } from "./i18n";
+
+// compass letters per UI language (O = Ouest/West in fr/de/es)
+const COMPASS: Record<Lang, readonly string[]> = {
+  en: ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
+  fr: ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"],
+  de: ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
+  es: ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"],
+};
+
+const LOCALES: Record<Lang, string> = {
+  en: "en-GB",
+  fr: "fr-FR",
+  de: "de-DE",
+  es: "es-ES",
+};
 
 export const DEMO_POINT = { lat: 45.945, lon: 6.71, label: "Aravis" } as const;
 
@@ -30,11 +28,11 @@ export function parseCoord(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function compass(dir: number | null | undefined): string {
+export function compass(dir: number | null | undefined, lang: Lang = "en"): string {
   if (dir == null || !Number.isFinite(dir)) return "—";
   const deg = ((dir % 360) + 360) % 360;
   const i = Math.round(deg / 22.5) % 16;
-  return COMPASS[i] ?? "—";
+  return COMPASS[lang][i] ?? "—";
 }
 
 export function fmtT(v: number | null | undefined): string {
@@ -109,7 +107,10 @@ export function slotsForDay(hours: Hour[]): HourSlot[] {
   }));
 }
 
-export function groupByDay(hours: Hour[]): { key: string; label: string; hours: Hour[] }[] {
+export function groupByDay(
+  hours: Hour[],
+  lang: Lang = "en",
+): { key: string; label: string; hours: Hour[] }[] {
   const map = new Map<string, Hour[]>();
   for (const hour of hours) {
     if (!isDisplayHour(hour.time)) continue;
@@ -121,14 +122,14 @@ export function groupByDay(hours: Hour[]): { key: string; label: string; hours: 
   return [...map.entries()]
     .map(([key, list]) => ({
       key,
-      label: dayLabel(list[0]?.time ?? key),
+      label: dayLabel(list[0]?.time ?? key, lang),
       hours: list,
     }))
     .filter((d) => d.hours.length > 0);
 }
 
-export function dayLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
+export function dayLabel(iso: string, lang: Lang = "en"): string {
+  return new Date(iso).toLocaleDateString(LOCALES[lang], {
     weekday: "short",
     day: "numeric",
     month: "short",

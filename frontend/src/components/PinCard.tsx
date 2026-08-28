@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type { AromeResponse } from "../api/types";
 import { groupByDay } from "../lib/format";
+import { interpolate } from "../lib/i18n";
+import { useI18n } from "../i18nContext";
 import { pinKey, type Pin } from "../lib/pins";
 import { Sounding } from "./Sounding";
 import { SurfaceStats } from "./SurfaceStats";
@@ -20,15 +22,17 @@ type Props = {
   hourTime: string | null;
   view: "windgram" | "sounding";
   zMax: number;
+  compact: boolean;
   onRemove: () => void;
 };
 
-export function PinCard({ pin, state, dayKey, hourTime, view, zMax, onRemove }: Props) {
+export function PinCard({ pin, state, dayKey, hourTime, view, zMax, compact, onRemove }: Props) {
+  const { t, lang } = useI18n();
   const [activeZ, setActiveZ] = useState<number | null>(null);
   const label = pin.name ?? `${pin.lat.toFixed(4)}, ${pin.lon.toFixed(4)}`;
   const days = useMemo(
-    () => (state?.status === "ready" ? groupByDay(state.data.hours) : []),
-    [state],
+    () => (state?.status === "ready" ? groupByDay(state.data.hours, lang) : []),
+    [state, lang],
   );
   const effDay = dayKey != null && days.some((d) => d.key === dayKey) ? dayKey : days[0]?.key;
   const hours = days.find((d) => d.key === effDay)?.hours ?? [];
@@ -36,29 +40,29 @@ export function PinCard({ pin, state, dayKey, hourTime, view, zMax, onRemove }: 
   const data = state?.status === "ready" ? state.data : null;
 
   return (
-    <section className="board-card" aria-label={`Pinned place ${label}`}>
+    <section className="board-card" aria-label={interpolate(t.pinAria, { label })}>
       <div className="board-card-head">
         <span className="board-card-name">{label}</span>
         <button
           type="button"
           className="board-card-remove"
-          aria-label={`Remove ${label} from the comparison`}
+          aria-label={interpolate(t.pinRemoveAria, { label })}
           onClick={onRemove}
         >
           ✕
         </button>
       </div>
       {state == null || state.status === "loading" ? (
-        <p className="board-card-note">Loading…</p>
+        <p className="board-card-note">{t.loading}</p>
       ) : state.status === "error" ? (
         <p className="board-card-note error" role="alert">
           {state.message}
         </p>
       ) : view === "windgram" ? (
         hours.length > 0 ? (
-          <Windgram hours={hours} elevationM={data!.modelElevationM} zMax={zMax} />
+          <Windgram hours={hours} elevationM={data!.modelElevationM} zMax={zMax} compact={compact} />
         ) : (
-          <p className="board-card-note">No data for this day.</p>
+          <p className="board-card-note">{t.noDataDay}</p>
         )
       ) : hour ? (
         <>
@@ -71,11 +75,12 @@ export function PinCard({ pin, state, dayKey, hourTime, view, zMax, onRemove }: 
           />
         </>
       ) : (
-        <p className="board-card-note">No data for this day.</p>
+        <p className="board-card-note">{t.noDataDay}</p>
       )}
       {data ? (
         <p className="board-card-foot">
-          {pinKey(pin)} · {data.model} {data.grid} · alt. {data.modelElevationM}&nbsp;m
+          {pinKey(pin)} · {data.model} {data.grid} ·{" "}
+          {interpolate(t.pinAlt, { m: data.modelElevationM })}
         </p>
       ) : null}
     </section>

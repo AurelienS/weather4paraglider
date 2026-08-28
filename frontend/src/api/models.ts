@@ -32,6 +32,8 @@ export type ModelDef = {
   aglHeights: readonly number[];
   pressureLevels: readonly number[];
   domain: ModelDomain;
+  /** Dropdown grouping: nowcast / low-level precision / full sky / longer range. */
+  group: "nowcast" | "lowLevel" | "allAltitude" | "longRange";
 };
 
 const AROME_DOMAIN: ModelDomain = {
@@ -93,6 +95,7 @@ export const MODELS: readonly ModelDef[] = [
     extraHourlyVars: ["cloud_cover_mid", "cloud_cover_high"],
     aglHeights: [20, 50, 100],
     pressureLevels: [],
+    group: "nowcast",
     domain: AROME_DOMAIN,
   },
   {
@@ -107,6 +110,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [20, 50, 80, 100],
     pressureLevels: [],
+    group: "lowLevel",
     domain: AROME_DOMAIN,
   },
   {
@@ -121,6 +125,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
     pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    group: "allAltitude",
     domain: AROME_DOMAIN,
   },
   {
@@ -135,6 +140,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
     pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    group: "longRange",
     domain: EUROPE_DOMAIN,
   },
   {
@@ -149,6 +155,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
     pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    group: "longRange",
     domain: WORLD_DOMAIN,
   },
   {
@@ -163,6 +170,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [],
     pressureLevels: [],
+    group: "lowLevel",
     domain: CH1_DOMAIN,
   },
   {
@@ -177,6 +185,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [80, 100, 120, 180, 200],
     pressureLevels: [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500],
+    group: "allAltitude",
     domain: D2_DOMAIN,
   },
   {
@@ -191,6 +200,7 @@ export const MODELS: readonly ModelDef[] = [
     slotHours: 3,
     aglHeights: [50, 80, 100, 120, 150],
     pressureLevels: [1000, 950, 925, 900, 850],
+    group: "allAltitude",
     domain: DMI_DOMAIN,
   },
 ];

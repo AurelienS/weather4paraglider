@@ -3,6 +3,7 @@ import { assembleResponse, cacheSlotUtc, resolveWindow, roundPoint } from "./pip
 import { fetchOpenMeteo, NO_DATA_REASON, OpenMeteoError } from "./openmeteo";
 import type { AromeResponse } from "./types";
 import { inModelDomain, modelById, type ModelDef, type ModelId } from "./models";
+import { dict, type Lang } from "../lib/i18n";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -14,42 +15,32 @@ export class ApiError extends Error {
   }
 }
 
-function noDataMessage(model: ModelDef): string {
-  return (
-    `${model.label} has no data for this location: this model covers a smaller area. ` +
-    "Pick another model in the toolbar (AROME covers all of France)."
-  );
+function noDataMessage(model: ModelDef, lang: Lang): string {
+  return dict(lang).errNoData.replace("{model}", model.label);
 }
 
-function friendlyMessage(err: unknown): string {
+function friendlyMessage(err: unknown, lang: Lang): string {
+  const t = dict(lang);
   if (err instanceof OpenMeteoError && err.status === 429) {
-    return (
-      "Open-Meteo rate limit reached for your connection. " +
-      "The app queries this free service directly; its quota is counted " +
-      "per user and renews over time. The local cache already limits " +
-      "calls — try again in a few minutes."
-    );
+    return t.errRateLimit;
   }
   if (err instanceof OpenMeteoError && err.status >= 500) {
-    return (
-      "Open-Meteo is temporarily unavailable. " +
-      "Try again in a moment — the data should come back."
-    );
+    return t.errServer;
   }
   if (err instanceof OpenMeteoError) {
     return err.message;
   }
   if (err instanceof Error && err.message.includes("fetch")) {
-    return "Could not reach Open-Meteo — check your internet connection.";
+    return t.errNetwork;
   }
-  return err instanceof Error && err.message
-    ? err.message
-    : "An unexpected error occurred.";
+  return err instanceof Error && err.message ? err.message : t.errUnexpected;
 }
 
 export type FetchAromeOpts = {
   force?: boolean;
   signal?: AbortSignal;
+  /** Language for the user-facing error messages. */
+  lang?: Lang;
 };
 
 // identical concurrent requests share one in-flight Open-Meteo call; the call
@@ -95,9 +86,10 @@ export async function fetchArome(
   modelId: ModelId,
   opts: FetchAromeOpts = {},
 ): Promise<AromeResponse> {
+  const lang = opts.lang ?? "en";
   const model = modelById(modelId);
   if (!inModelDomain(lat, lon, model.domain)) {
-    throw new ApiError(noDataMessage(model), 400);
+    throw new ApiError(noDataMessage(model, lang), 400);
   }
   const slot = cacheSlotUtc(Date.now(), model.slotHours);
   const window = resolveWindow(Date.now(), model.days);
@@ -128,9 +120,9 @@ export async function fetchArome(
             err instanceof OpenMeteoError &&
             err.message.includes(NO_DATA_REASON)
           ) {
-            throw new ApiError(noDataMessage(model), 400);
+            throw new ApiError(noDataMessage(model, lang), 400);
           }
-          throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err), 502);
+          throw err instanceof ApiError ? err : new ApiError(friendlyMessage(err, lang), 502);
         }
 
         const payload = assembleResponse(lat, lon, model, raw, slot, window);

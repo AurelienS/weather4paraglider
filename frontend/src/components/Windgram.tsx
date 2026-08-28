@@ -12,15 +12,23 @@ import {
   type GramCell,
 } from "../lib/windgram";
 import { WindArrow } from "./WindArrow";
+import { useI18n } from "../i18nContext";
+import { interpolate, type Dict } from "../lib/i18n";
 
 type Props = {
   hours: Hour[];
   elevationM: number;
   zMax: number;
+  /** Phone layout: every other hour, tighter cells so the grid fits. */
+  compact?: boolean;
 };
 
-export function Windgram({ hours, elevationM, zMax }: Props) {
-  const slots = useMemo(() => slotsForDay(hours), [hours]);
+export function Windgram({ hours, elevationM, zMax, compact = false }: Props) {
+  const { t } = useI18n();
+  const slots = useMemo(
+    () => slotsForDay(hours).filter((_, i) => (compact ? i % 2 === 0 : true)),
+    [hours, compact],
+  );
   const levels = useMemo(() => {
     const dataMax = Math.max(0, ...hours.flatMap((h) => h.profile.map((p) => p.z)));
     return altitudeLevels(elevationM, Math.min(zMax, dataMax)).slice().reverse();
@@ -75,7 +83,7 @@ export function Windgram({ hours, elevationM, zMax }: Props) {
   }
 
   return (
-    <div className="wg-panel" ref={panelRef}>
+    <div className={compact ? "wg-panel is-compact" : "wg-panel"} ref={panelRef}>
       <div className="wg-scroll">
         <table className="wg">
           <thead>
@@ -99,12 +107,13 @@ export function Windgram({ hours, elevationM, zMax }: Props) {
                     cell={grid[col]?.[row]}
                     iso0={iso0Z[col] === z}
                     onTip={showTip}
+                    t={t}
                   />
                 ))}
               </tr>
             ))}
             <tr className="sol">
-              <th className="z">sol {elevationM}</th>
+              <th className="z">{interpolate(t.sol, { m: elevationM })}</th>
               {slots.map((slot, col) => (
                 <WindCell
                   key={slot.hour}
@@ -116,17 +125,19 @@ export function Windgram({ hours, elevationM, zMax }: Props) {
                           elevationM,
                           cblByTime.get(slot.data.time) ?? null,
                         )
-                      : undefined
+                    : undefined
                   }
                   iso0={iso0Z[col] === elevationM}
                   onTip={showTip}
+                  t={t}
                 />
               ))}
             </tr>
             <tr className="band precip">
-              <th className="z">pluie</th>
+              <th className="z">{t.rain}</th>
               {slots.map((slot) => {
-                if (!slot.data) return <EmptyBand key={slot.hour} onTip={showTip} />;
+                if (!slot.data)
+                  return <EmptyBand key={slot.hour} onTip={showTip} label={t.outOfForecast} />;
                 const p = slot.data.surface.precip ?? 0;
                 return (
                   <td
@@ -145,11 +156,12 @@ export function Windgram({ hours, elevationM, zMax }: Props) {
               })}
             </tr>
             <tr className="band">
-              <th className="z">T sol</th>
+              <th className="z">{t.tSoil}</th>
               {slots.map((slot) => {
                 const hour = slot.data;
-                if (!hour) return <EmptyBand key={slot.hour} onTip={showTip} />;
-                const tTxt = hour.surface.t2m == null ? "T —" : `T ${hour.surface.t2m.toFixed(1)}°`;
+                if (!hour) return <EmptyBand key={slot.hour} onTip={showTip} label={t.outOfForecast} />;
+                const tTxt =
+                  hour.surface.t2m == null ? t.tMissing : `T ${hour.surface.t2m.toFixed(1)}°`;
                 return (
                   <td
                     key={slot.hour}
@@ -199,14 +211,16 @@ function solCell(hour: Hour, elevationM: number, cblTop: number | null): GramCel
 
 function EmptyBand({
   onTip,
+  label,
 }: {
   onTip: (text: string | null, ev?: MouseEvent) => void;
+  label: string;
 }) {
   return (
     <td
       className="empty"
-      onMouseEnter={(e) => onTip("out of forecast", e)}
-      onMouseMove={(e) => onTip("out of forecast", e)}
+      onMouseEnter={(e) => onTip(label, e)}
+      onMouseMove={(e) => onTip(label, e)}
       onMouseLeave={() => onTip(null)}
     />
   );
@@ -217,18 +231,20 @@ function WindCell({
   cell,
   iso0,
   onTip,
+  t,
 }: {
   slot: HourSlot;
   cell: GramCell | undefined;
   iso0?: boolean;
   onTip: (text: string | null, ev?: MouseEvent) => void;
+  t: Dict;
 }) {
   if (!slot.data) {
     return (
       <td
         className="cell empty"
-        onMouseEnter={(e) => onTip("out of forecast", e)}
-        onMouseMove={(e) => onTip("out of forecast", e)}
+        onMouseEnter={(e) => onTip(t.outOfForecast, e)}
+        onMouseMove={(e) => onTip(t.outOfForecast, e)}
         onMouseLeave={() => onTip(null)}
       />
     );
@@ -241,7 +257,7 @@ function WindCell({
     cell.wind != null && cell.gust != null && cell.gust >= cell.wind + 5
       ? cell.gust
       : null;
-  const text = cellTip(cell);
+  const text = cellTip(cell, t);
   return (
     <td
       className={`cell${iso0 ? " iso0" : ""}${gust != null ? " has-gust" : ""}`}
@@ -265,8 +281,8 @@ function WindCell({
   );
 }
 
-function cellTip(cell: GramCell): string {
-  const t = cell.t == null ? "T —" : `T ${cell.t.toFixed(1)}°`;
-  const neb = `neb ${cell.cloud ?? 0}%`;
-  return `${t} · ${neb}`;
+function cellTip(cell: GramCell, t: Dict): string {
+  const tTxt = cell.t == null ? t.tMissing : `T ${cell.t.toFixed(1)}°`;
+  const neb = interpolate(t.tipNeb, { n: cell.cloud ?? 0 });
+  return `${tTxt} · ${neb}`;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Favorite } from "../lib/favorites";
+import { interpolate } from "../lib/i18n";
+import { useI18n } from "../i18nContext";
 
 type Props = {
   list: Favorite[];
@@ -20,6 +22,7 @@ export function FavoritesMenu({
   onPick,
   onRemove,
 }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +48,7 @@ export function FavoritesMenu({
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
       >
-        Favorites ({list.length})
+        {interpolate(t.favorites, { n: list.length })}
       </button>
       {open ? (
         <ul className="fav-list" role="menu">
@@ -65,7 +68,7 @@ export function FavoritesMenu({
                   role="menuitem"
                   className="fav-item"
                   disabled={disabled}
-                  title={disabled ? "Already in the comparison" : undefined}
+                  title={disabled ? t.alreadyInCompare : undefined}
                   onClick={() => pick(fav)}
                 >
                   <span className="fav-label">{fav.label}</span>
@@ -77,7 +80,7 @@ export function FavoritesMenu({
                   <button
                     type="button"
                     className="fav-remove"
-                    aria-label={`Remove ${fav.label} from favorites`}
+                    aria-label={interpolate(t.removeFavoriteAria, { label: fav.label })}
                     onClick={() => onRemove(fav)}
                   >
                     ×
@@ -87,7 +90,10 @@ export function FavoritesMenu({
             );
           })}
           {list.length === 0 ? (
-            <li className="fav-empty">No favorites saved.</li>
+            <li className="fav-empty">
+              {t.favoritesEmpty}
+              <span className="fav-empty-hint">{t.favoritesEmptyHint}</span>
+            </li>
           ) : null}
         </ul>
       ) : null}

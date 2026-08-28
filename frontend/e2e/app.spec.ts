@@ -5,10 +5,90 @@ test.beforeEach(async ({ page }: { page: Page }) => {
   await blockTiles(page);
 });
 
+test("the theme switcher toggles and persists the theme", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "light");
+  await page.locator('button[aria-label="Switch to dark theme"]').click();
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('button[aria-label="Switch to light theme"]')).toBeVisible();
+  await page.reload();
+  await expect(html).toHaveAttribute("data-theme", "dark");
+});
+
+test("the language switcher translates the UI and persists", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".site-form button", { hasText: "Refresh" })).toBeVisible();
+  await page.locator('select[aria-label="Language"]').selectOption("fr");
+  await expect(page.locator(".site-form button", { hasText: "Rafraîchir" })).toBeVisible();
+  await expect(page.locator(".place-line .fav-add")).toHaveText("+ Favori");
+  await page.reload();
+  await expect(page.locator(".site-form button", { hasText: "Rafraîchir" })).toBeVisible();
+});
+
+test.describe("browser language", () => {
+  test.use({ locale: "fr-FR" });
+
+  test("defaults to the browser language", async ({ page }) => {
+    await mockOpenMeteo(page);
+    await page.goto("/?lat=45.945&lon=6.71");
+    await expect(page.locator(".site-form button", { hasText: "Rafraîchir" })).toBeVisible();
+    await expect(page.locator('select[aria-label="Langue"]')).toBeVisible();
+  });
+});
+
+test("the getting-started guide explains models, coverage and quota", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  await page.locator('button:has-text("Getting started")').click();
+  await expect(page.locator(".guide")).toBeVisible();
+  await expect(page.locator(".guide h2")).toHaveText("Getting started");
+  await expect(page.locator(".guide")).toContainText("Which model should I use?");
+  await expect(page.locator(".guide")).toContainText("AROME HD 1.3 km");
+  await expect(page.locator(".guide")).toContainText("high-altitude layers");
+  await expect(page.locator(".guide")).toContainText("Open-Meteo quota");
+  await expect(page.locator(".guide")).toContainText("per visitor");
+  // the guide now also covers the windgram, the sounding, the selling points,
+  // the data source and contributions
+  await expect(page.locator(".guide h3", { hasText: "Reading the windgram" })).toBeVisible();
+  await expect(page.locator(".gram-demo rect").first()).toBeVisible();
+  await expect(page.locator(".gram-legend")).toContainText("gust");
+  await expect(page.locator(".gram-scale")).toContainText("km/h");
+  await expect(page.locator(".guide h3", { hasText: "The sounding, layer by layer" })).toBeVisible();
+  await expect(page.locator(".guide")).toContainText("9.8 °C per kilometer");
+  await expect(page.locator(".guide")).toContainText("left of that line");
+  await expect(page.locator(".guide")).toContainText("Why this app?");
+  await expect(page.locator(".guide")).toContainText("latest run");
+  await expect(page.locator(".guide")).toContainText("Where the data comes from");
+  await expect(page.locator(".guide")).toContainText("grid cell");
+  await expect(page.locator(".guide h3", { hasText: "Contributions welcome" })).toBeVisible();
+  await expect(page.locator('.guide a:has-text("Report a bug")')).toHaveAttribute(
+    "href",
+    "https://github.com/AurelienS/weather4paraglider/issues/new?labels=bug",
+  );
+  await expect(page.locator('.guide a:has-text("Suggest an improvement")')).toHaveAttribute(
+    "href",
+    "https://github.com/AurelienS/weather4paraglider/issues/new?labels=enhancement",
+  );
+  // the app content is hidden while the guide is open, and the URL is shareable
+  await expect(page.locator(".wg")).toHaveCount(0);
+  await expect(page).toHaveURL(/guide=1/);
+
+  await page.locator('button:has-text("Back to the app")').click();
+  await expect(page.locator(".guide")).toHaveCount(0);
+  await expect(page.locator(".wg").first()).toBeVisible();
+  await expect(page).not.toHaveURL(/guide=1/);
+});
+
 test("renders the AROME windgram for the URL point", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
-  await expect(page).toHaveURL(/model=arome_france/);
+  // demo point + default model collapse to the clean home URL
+  await expect(page).not.toHaveURL(/[?&](lat|model)=/);
   await expect(page.locator(".meta")).toContainText("AROME 0.025°");
   await expect(page.locator(".meta")).toContainText("model alt. 1696");
   await expect(page.locator('.seg[aria-label="Day"] button')).toHaveCount(3);
@@ -54,6 +134,60 @@ test("model selection switches the forecast window and URL", async ({ page }) =>
   expect(om.calls()).toBe(before);
 });
 
+test("the model dropdown groups models by use case", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  const pick = page.getByLabel("Model");
+  await expect(pick.locator("optgroup")).toHaveCount(4);
+  await expect(pick.locator('optgroup[label="Nowcast — next hours"] option')).toHaveCount(1);
+  await expect(pick.locator('optgroup[label="Precise near the ground"] option')).toHaveCount(2);
+  await expect(pick.locator('optgroup[label="Precise at all altitudes"] option')).toHaveCount(3);
+  await expect(pick.locator('optgroup[label="Longer range (4 days)"] option')).toHaveCount(2);
+  // every model stays selectable through its group
+  await pick.selectOption("arome_france_hd");
+  await expect(page.locator(".meta")).toContainText("0.01°");
+});
+
+test("clicking the logo returns to the clean home page", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhoton(page);
+  await page.goto("/");
+  await page.locator("#place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+  await expect(page).toHaveURL(/lat=45\.8992&lon=6\.1294/);
+
+  // back home: demo point, clean URL, guide and compare closed
+  await page.locator(".brand-home").click();
+  await expect(page).not.toHaveURL(/[?&]/);
+  await expect(page.locator(".meta")).toContainText("45.945°N 6.710°E");
+  await expect(page.locator(".board")).toHaveCount(0);
+
+  // the logo also closes the guide
+  await page.locator('button:has-text("Getting started")').click();
+  await expect(page.locator(".guide")).toBeVisible();
+  await page.locator(".brand-home").click();
+  await expect(page.locator(".guide")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/[?&]/);
+});
+
+test("loading and error notices float as toasts over the charts", async ({ page }) => {
+  await mockOpenMeteo(page, { delay: 600 });
+  await mockPhoton(page);
+  await page.goto("/");
+  await page.locator("#place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+
+  // while loading, the notice sits at the top-right, above the content
+  const toast = page.locator(".flash .banner");
+  await expect(toast).toBeVisible();
+  const box = (await toast.boundingBox())!;
+  expect(box.y).toBeLessThan(60);
+  expect(box.x).toBeGreaterThan(700);
+
+  await expect(page.locator(".flash .banner")).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+});
+
 test("15-minute nowcast model decimates to hourly and caches", async ({ page }) => {
   const om = await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71&model=arome_france_15min");
@@ -87,8 +221,37 @@ test("out-of-domain API response maps to a model-not-available message", async (
 test("without URL params, falls back to the Aravis demo point", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/");
-  await expect(page).toHaveURL(/lat=45\.945&lon=6\.71/);
+  // demo point + default model keep the URL clean (no params)
+  await expect(page).not.toHaveURL(/[?&](lat|model)=/);
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator(".meta")).toContainText("45.945°N 6.710°E");
+});
+
+test("on a phone the windgram is compact and fits without inner scrolling", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator(".wg-panel.is-compact")).toBeVisible();
+  // hours are decimated: every other hour of the 07:00–22:00 window
+  await expect(page.locator(".wg thead th")).toHaveCount(9); // m + 8 hours
+  // the grid fits the viewport: no horizontal scroll inside the panel
+  const scroll = await page.locator(".wg-scroll").evaluate((el) => ({
+    inner: el.scrollWidth,
+    outer: el.clientWidth,
+  }));
+  expect(scroll.inner).toBeLessThanOrEqual(scroll.outer + 1);
+  // the page itself can scroll vertically to see the whole grid
+  const metrics = await page.evaluate(() => ({
+    doc: document.documentElement.scrollHeight,
+    view: window.innerHeight,
+  }));
+  expect(metrics.doc).toBeGreaterThan(metrics.view);
+  // and the chart is readable: bigger numbers than on desktop
+  const font = await page
+    .locator(".wg td.cell .n b")
+    .first()
+    .evaluate((el) => getComputedStyle(el).fontSize);
+  expect(parseFloat(font)).toBeGreaterThanOrEqual(12);
 });
 
 test("reloading reads the localStorage cache without calling Open-Meteo", async ({ page }) => {
@@ -236,7 +399,7 @@ test("place search loads a new point", async ({ page }) => {
   await expect(page.locator(".meta")).toContainText("45.923°N 6.869°E");
 });
 
-test("favorites: default sites, selection, add, remove and persistence", async ({ page }) => {
+test("favorites: start empty, add, pick, remove and persistence", async ({ page }) => {
   await mockOpenMeteo(page);
   await mockPhoton(page);
   await page.goto("/?lat=45.945&lon=6.71");
@@ -244,37 +407,44 @@ test("favorites: default sites, selection, add, remove and persistence", async (
 
   const favBtn = page.locator('.fav-menu > button:has-text("Favorites")');
   const favAdd = page.locator(".fav-add");
+
+  // no hardcoded defaults: the empty menu explains how to add a favorite
   await favBtn.click();
-  await expect(page.locator(".fav-item")).toHaveCount(10);
-  await expect(page.locator(".fav-item:has-text('Puy de Dôme')")).toBeVisible();
-
-  await page.locator(".fav-item:has-text('Puy de Dôme')").click();
-  await expect(page).toHaveURL(/lat=45\.7726&lon=2\.9646/);
-  await expect(page.locator(".place-line strong")).toHaveText("Puy de Dôme");
-  // already a favorite: the add button is hidden (but keeps its space)
-  await expect(favAdd).toBeHidden();
-
-  await page.locator("#place").fill("chamo");
-  await expect(page.locator(".place-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
-
-  await expect(favAdd).toHaveText("+ Favorite");
-  await expect(favAdd).toBeVisible();
-  await favAdd.click();
-  await expect(favAdd).toBeHidden();
-  await expect(favBtn).toHaveText("Favorites (11)");
-
-  await favBtn.click();
-  await page.locator('.fav-list li:has-text("Aravis") .fav-remove').click();
-  await expect(favBtn).toHaveText("Favorites (10)");
+  await expect(page.locator(".fav-empty")).toContainText("No favorites yet.");
+  await expect(page.locator(".fav-empty-hint")).toContainText("+ Favorite");
   await page.mouse.click(20, 500);
 
+  // load Chamonix and save it as a favorite
+  await page.locator("#place").fill("chamo");
+  await page.locator(".place-menu button:has-text('Chamonix-Mont-Blanc')").click();
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  await favAdd.click();
+  await expect(favAdd).toBeHidden();
+  await expect(favBtn).toHaveText("Favorites (1)");
+
+  // picking the favorite loads its point and shows it as saved
+  await favBtn.click();
+  await page.locator(".fav-item:has-text('Chamonix-Mont-Blanc')").click();
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  await expect(favAdd).toBeHidden();
+
+  // a second favorite
+  await page.locator("#place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+  await favAdd.click();
+  await expect(favBtn).toHaveText("Favorites (2)");
+
+  // remove the Annecy favorite
+  await favBtn.click();
+  await page.locator('.fav-list li:has-text("Annecy") .fav-remove').click();
+  await expect(favBtn).toHaveText("Favorites (1)");
+  await page.mouse.click(20, 500);
+
+  // favorites persist across a reload
   await page.reload();
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
   await favBtn.click();
-  await expect(page.locator(".fav-item")).toHaveCount(10);
-  await expect(page.locator(".fav-item:has-text('Aravis')")).toHaveCount(0);
+  await expect(page.locator(".fav-item")).toHaveCount(1);
   await expect(page.locator(".fav-item:has-text('Chamonix-Mont-Blanc')")).toHaveCount(1);
 });
 
@@ -336,6 +506,19 @@ test("enabling Compare places pins the current place", async ({ page }) => {
 test("in compare mode every loaded place joins the board", async ({ page }) => {
   const om = await mockOpenMeteo(page);
   await mockPhoton(page);
+  // seeded favorites: Aravis matches the current place, so it shows disabled
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "w4p.favorites.v1",
+      JSON.stringify({
+        v: 1,
+        data: [
+          { lat: 45.945, lon: 6.71, label: "Aravis" },
+          { lat: 45.7726, lon: 2.9646, label: "Puy de Dôme" },
+        ],
+      }),
+    );
+  });
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=46.1,6.2/Plaine%20Joux");
   await expect(page.locator(".board-card-name").first()).toBeVisible();
   // the current place is pinned on mount (appended last), the main windgram never shows
@@ -440,9 +623,20 @@ test("pinned names survive a reload", async ({ page }) => {
   await expect(page.locator(".board-card-name")).toHaveText("Chamonix");
   expect(om.calls()).toBe(1);
 
-  // with compare off, the header reuses the pin name for the current place
+  // with compare off, the header shows the current place (reverse-geocoded
+  // name from Photon, which contains the pin's name)
   await page.getByLabel("Compare places").uncheck();
-  await expect(page.locator(".place-line strong")).toHaveText("Chamonix");
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix");
+});
+
+test("a shared URL shows the place name, not bare coordinates", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhoton(page);
+  await page.goto("/?lat=45.9546371&lon=6.7539224&model=arome_france");
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  // the data still loads for the exact shared coordinates
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator(".meta")).toContainText("45.955°N 6.754°E");
 });
 
 test("unchecking Compare places hides the board but keeps the pins", async ({ page }) => {

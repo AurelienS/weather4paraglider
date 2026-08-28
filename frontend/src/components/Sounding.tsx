@@ -2,6 +2,8 @@ import { useId, useMemo, type MouseEvent } from "react";
 import type { Hour, ProfilePoint } from "../api/types";
 import { clamp, linePath, niceRange, ticks } from "../lib/chart";
 import { compass, srcLabel } from "../lib/format";
+import { interpolate, type Dict, type Lang } from "../lib/i18n";
+import { useI18n } from "../i18nContext";
 
 const VB_W = 920;
 const VB_H = 560;
@@ -18,6 +20,7 @@ type Props = {
 };
 
 export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
+  const { t, lang } = useI18n();
   const layout = useMemo(() => buildLayout(hour, elevationM), [hour, elevationM]);
   const uid = useId().replace(/:/g, "");
 
@@ -38,7 +41,7 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
         className="sounding"
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         role="img"
-        aria-label="Sounding: T, Td and wind. Vertical axis = dry adiabat."
+        aria-label={t.soundingAria}
         onMouseMove={onMove}
         onMouseLeave={() => onActiveZ(null)}
       >
@@ -132,7 +135,7 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
                   textAnchor="start"
                   transform={`rotate(-90 ${layout.dalrX + 12} ${layout.plotBottom - 8})`}
                 >
-                  dry adiabat
+                  {t.dryAdiabat}
                 </text>
               </>
             ) : null}
@@ -143,15 +146,20 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
             ))}
           </g>
           {layout.cloudBaseY != null ? (
-            <text x={layout.tempRight - 6} y={layout.cloudBaseY - 5} className="anno" textAnchor="end">
-              base {hour.surface.cloudBaseM} m
+            <text
+              x={layout.tempRight - 6}
+              y={layout.cloudBaseY - 5}
+              className="anno"
+              textAnchor="end"
+            >
+              {interpolate(t.cloudBaseAnno, { m: hour.surface.cloudBaseM ?? 0 })}
             </text>
           ) : null}
           <text x={PAD.left + 6} y={PAD.top + 14} className="anno">
-            ← unstable
+            {t.unstable}
           </text>
           <text x={layout.tempRight - 6} y={PAD.top + 14} className="anno" textAnchor="end">
-            stable →
+            {t.stable}
           </text>
         </g>
 
@@ -199,38 +207,52 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
         ) : null}
 
         <text x={PAD.left} y={18} className="axis-title">
-          T / Td · vertical = γd 9.8 K/km
+          {t.axisTemp}
         </text>
         <text x={layout.windLeft} y={18} className="axis-title">
-          Wind (km/h)
+          {t.axisWind}
         </text>
         <text x={PAD.left - 8} y={PAD.top - 8} className="axis-title" textAnchor="end">
           m
         </text>
       </svg>
 
-      {hover ? <HoverCard point={hover} x={layout.tempRight} y={layout.yOf(hover.z)} /> : null}
+      {hover ? (
+        <HoverCard point={hover} x={layout.tempRight} y={layout.yOf(hover.z)} t={t} lang={lang} />
+      ) : null}
 
       <ul className="legend">
         <li>
-          <i className="swatch t" /> air T
+          <i className="swatch t" /> {t.legendAirT}
         </li>
         <li>
-          <i className="swatch td" /> Td
+          <i className="swatch td" /> {t.legendTd}
         </li>
         <li>
-          <i className="swatch dalr" /> dry adiabat (vertical)
+          <i className="swatch dalr" /> {t.legendDalr}
         </li>
-        <li>leaning left = unstable</li>
+        <li>{t.legendUnstable}</li>
         <li>
-          <i className="swatch wind" /> wind
+          <i className="swatch wind" /> {t.legendWind}
         </li>
       </ul>
     </div>
   );
 }
 
-function HoverCard({ point, x, y }: { point: ProfilePoint; x: number; y: number }) {
+function HoverCard({
+  point,
+  x,
+  y,
+  t,
+  lang,
+}: {
+  point: ProfilePoint;
+  x: number;
+  y: number;
+  t: Dict;
+  lang: Lang;
+}) {
   const spread = point.t != null && point.td != null ? (point.t - point.td).toFixed(1) : null;
   return (
     <div
@@ -245,12 +267,14 @@ function HoverCard({ point, x, y }: { point: ProfilePoint; x: number; y: number 
       </strong>
       <span>
         T {fmt(point.t)} · Td {fmt(point.td)}
-        {spread ? ` · T−Td ${spread} K` : ""}
+        {spread ? ` · ${interpolate(t.hintSpread, { x: spread })}` : ""}
       </span>
       <span>
-        {point.wind == null ? "wind —" : `${point.wind} km/h ${compass(point.dir)}`}
+        {point.wind == null ? t.hoverWind : `${point.wind} km/h ${compass(point.dir, lang)}`}
         {point.rh != null ? ` · RH ${point.rh}%` : ""}
-        {point.cloud != null ? ` · cloud ${point.cloud}%` : ""}
+        {point.cloud != null
+          ? ` · ${interpolate(t.hoverCloud, { n: point.cloud })}`
+          : ""}
       </span>
     </div>
   );
@@ -288,7 +312,13 @@ function buildLayout(hour: Hour, elevationM: number) {
 
   const t0 = profile[0]?.t;
   const z0 = profile[0]?.z ?? zRef;
-  const thCenter = t0 != null ? thetaOf(t0, z0, zRef) : 15;
+  // the vertical reference follows the surface parcel — the 2 m temperature
+  // placed at the first profile level — so "left of the line = unstable"
+  // matches the convective layer shaded in the windgram (convectiveTop uses
+  // the same reference). Using the cooler 20 m level instead would push the
+  // line left and make the convective layer look stable.
+  const tSurface = hour.surface.t2m ?? t0;
+  const thCenter = tSurface != null ? thetaOf(tSurface, z0, zRef) : 15;
   const tThetas = profile
     .filter((p) => p.t != null)
     .map((p) => thetaOf(p.t as number, p.z, zRef));

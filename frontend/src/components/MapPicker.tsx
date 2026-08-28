@@ -6,6 +6,8 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { placeText, reverseGeocode } from "../lib/geocode";
 import { isGlobalDomain, type ModelDef } from "../api/models";
+import { interpolate } from "../lib/i18n";
+import { useI18n } from "../i18nContext";
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -22,6 +24,7 @@ type Props = {
 };
 
 export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
+  const { t } = useI18n();
   const domain = model.domain;
   const inDomain = (la: number, lo: number) =>
     la >= domain.latMin && la <= domain.latMax && lo >= domain.lonMin && lo <= domain.lonMax;
@@ -134,17 +137,17 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
       className="map-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Pick a point on the map"
+      aria-label={t.mapAria}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div className="map-panel">
         <div className="map-panel-head">
-          <strong>Pick a point</strong>
-          <span className="map-hint">Click or drag on the map — Esc to close</span>
+          <strong>{t.mapTitle}</strong>
+          <span className="map-hint">{t.mapHint}</span>
           <button type="button" className="btn" onClick={onCancel}>
-            Close
+            {t.mapClose}
           </button>
         </div>
         <div className="map-holder" ref={holderRef} />
@@ -158,7 +161,7 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
             }}
           >
             <input
-              aria-label="Latitude"
+              aria-label={t.latitude}
               inputMode="decimal"
               spellCheck={false}
               value={latShown}
@@ -166,20 +169,22 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
               onBlur={commitCoords}
             />
             <input
-              aria-label="Longitude"
+              aria-label={t.longitude}
               inputMode="decimal"
               spellCheck={false}
               value={lonShown}
               onChange={(e) => setLonDraft(e.target.value)}
               onBlur={commitCoords}
             />
-            <button type="submit" className="btn" aria-label="Apply coordinates">
+            <button type="submit" className="btn" aria-label={t.applyCoords}>
               OK
             </button>
           </form>
           <span className="map-spacer" />
           {!valid ? (
-            <span className="map-domain-warn">Out of {model.short} domain</span>
+            <span className="map-domain-warn">
+              {interpolate(t.outOfDomain, { model: model.short })}
+            </span>
           ) : null}
           <button
             type="button"
@@ -187,7 +192,7 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
             disabled={!valid}
             onClick={() => onPick(pos.lat, pos.lon, near)}
           >
-            Use this point
+            {t.usePoint}
           </button>
         </div>
       </div>

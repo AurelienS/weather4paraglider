@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { searchPlaces, type Place } from "../lib/geocode";
 import type { ModelDef } from "../api/models";
+import { useI18n } from "../i18nContext";
 
 type Props = {
   disabled: boolean;
@@ -21,11 +22,14 @@ export function PlaceSearch({
   model,
   onPick,
   id = "place",
-  label = "Place",
+  label,
   ariaLabel,
-  placeholder = "Search a place — Chamonix, Annecy…",
+  placeholder,
   compact = false,
 }: Props) {
+  const { t } = useI18n();
+  const shownLabel = label === undefined ? t.placeLabel : label;
+  const shownPlaceholder = placeholder ?? t.placePlaceholder;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -102,13 +106,13 @@ export function PlaceSearch({
 
   return (
     <div className={compact ? "place-search is-compact" : "place-search"} ref={boxRef}>
-      {label ? (
+      {shownLabel ? (
         <label className="place-search-field">
-          {label}
+          {shownLabel}
           <input
             id={id}
             type="search"
-            placeholder={placeholder}
+            placeholder={shownPlaceholder}
             autoComplete="off"
             spellCheck={false}
             value={query}
@@ -128,8 +132,8 @@ export function PlaceSearch({
         <input
           id={id}
           type="search"
-          aria-label={ariaLabel ?? placeholder}
-          placeholder={placeholder}
+          aria-label={ariaLabel ?? shownPlaceholder}
+          placeholder={shownPlaceholder}
           autoComplete="off"
           spellCheck={false}
           value={query}
@@ -148,13 +152,13 @@ export function PlaceSearch({
       {showMenu ? (
         <ul className="place-menu" id={`${id}-results`} role="listbox">
           {searching && results.length === 0 ? (
-            <li className="place-empty">Searching…</li>
+            <li className="place-empty">{t.searching}</li>
           ) : null}
           {!searching && failed ? (
-            <li className="place-empty">Search unavailable.</li>
+            <li className="place-empty">{t.searchUnavailable}</li>
           ) : null}
           {!searching && !failed && results.length === 0 ? (
-            <li className="place-empty">No results.</li>
+            <li className="place-empty">{t.noResults}</li>
           ) : null}
           {results.map((place, i) => (
             <li key={`${place.lat},${place.lon},${i}`} role="none">

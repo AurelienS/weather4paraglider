@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Favorite } from "../lib/favorites";
 import type { Place } from "../lib/geocode";
 import { type ModelDef } from "../api/models";
+import { useI18n } from "../i18nContext";
 import { FavoritesMenu } from "./FavoritesMenu";
 import { MapPicker } from "./MapPicker";
 import { PlaceSearch } from "./PlaceSearch";
@@ -31,6 +32,7 @@ export function SiteForm({
   onSubmit,
   onRefresh,
 }: Props) {
+  const { t } = useI18n();
   const [mapOpen, setMapOpen] = useState(false);
 
   function pickPlace(place: Place) {
@@ -43,7 +45,17 @@ export function SiteForm({
 
   return (
     <div className="site-form">
-      <PlaceSearch disabled={loading} model={model} onPick={pickPlace} />
+      <div className="site-form-place-row">
+        <PlaceSearch disabled={loading} model={model} onPick={pickPlace} />
+        <button
+          type="button"
+          className="btn"
+          disabled={loading}
+          onClick={() => setMapOpen(true)}
+        >
+          {t.mapOpen}
+        </button>
+      </div>
       <div className="site-form-actions">
         <FavoritesMenu
           list={favs}
@@ -51,26 +63,16 @@ export function SiteForm({
           onPick={pickFavorite}
           onRemove={onFavoriteRemove}
         />
-        <button
-          type="button"
-          className="btn"
-          disabled={loading}
-          onClick={() => setMapOpen(true)}
-        >
-          Map…
-        </button>
         <button type="button" className="btn" disabled={loading} onClick={onRefresh}>
-          Refresh
+          {t.refresh}
         </button>
-      </div>
-      <div className="site-form-secondary">
-        <label className="pick pick-check" title="Stack several places on one page">
+        <label className="pick pick-check" title={t.compareHint}>
           <input
             type="checkbox"
             checked={compare}
             onChange={(e) => onCompareChange(e.target.checked)}
           />
-          Compare places
+          {t.compareCheck}
         </label>
       </div>
       {mapOpen ? (
