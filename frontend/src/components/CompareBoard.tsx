@@ -3,6 +3,7 @@ import { averageResponses } from "../lib/average";
 import { modelById } from "../api/models";
 import type { AromeResponse } from "../api/types";
 import { useStore } from "../stores";
+import type { View } from "../stores/types";
 import { AverageCard } from "./AverageCard";
 import { PinCard } from "./PinCard";
 
@@ -11,7 +12,7 @@ type Props = {
   dayKey: string | null;
   /** Time of the hour selected in the main toolbar (sounding sync). */
   hourTime: string | null;
-  view: "windgram" | "sounding";
+  view: View;
   zMax: number;
   compact: boolean;
 };

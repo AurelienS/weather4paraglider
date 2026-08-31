@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
+import { soundingAvailable } from "../api/pipeline";
 import { groupByDay, dayLabel, utcSlot } from "../lib/format";
+import { meteoHoursForDay } from "../lib/meteogram";
 import { interpolate } from "../lib/i18n";
 import { useI18n } from "../i18nContext";
 import { pinKey, type Pin } from "../lib/pins";
-import type { EntryState } from "../stores/types";
+import type { EntryState, View } from "../stores/types";
+import { Meteogram } from "./Meteogram";
 import { Sounding } from "./Sounding";
 import { SurfaceStats } from "./SurfaceStats";
 import { Windgram } from "./Windgram";
@@ -15,7 +18,7 @@ type Props = {
   dayKey: string | null;
   /** Time of the hour selected in the main toolbar (sounding sync). */
   hourTime: string | null;
-  view: "windgram" | "sounding";
+  view: View;
   zMax: number;
   compact: boolean;
   onRemove: () => void;
@@ -98,6 +101,18 @@ export function PinCard({
         ) : (
           <p className="board-card-note">{t.noDataDay}</p>
         )
+      ) : view === "meteogram" ? (
+        data && meteoHoursForDay(data.hours, effDay ?? "").length > 0 ? (
+          <Meteogram
+            hours={meteoHoursForDay(data.hours, effDay ?? "")}
+            elevationM={data.modelElevationM}
+            compact={compact}
+          />
+        ) : (
+          <p className="board-card-note">{t.noDataDay}</p>
+        )
+      ) : !soundingAvailable(data!) ? (
+        <p className="board-card-note">{t.soundingUnavailable}</p>
       ) : hour ? (
         <>
           <SurfaceStats hour={hour} elevationM={data!.modelElevationM} />

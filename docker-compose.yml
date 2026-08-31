@@ -8,7 +8,7 @@ services:
       - traefik_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.w4p.rule=Host(`weather4paragliding.codeas.me`)"
+      - "traefik.http.routers.w4p.rule=Host(`meteo.codeas.me`)"
       - "traefik.http.routers.w4p.entrypoints=websecure"
       - "traefik.http.routers.w4p.tls.certresolver=letsencrypt"
       # the nginx base image already exposes 80: pin the backend port

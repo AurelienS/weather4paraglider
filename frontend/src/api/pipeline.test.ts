@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cacheSlotUtc, hourHasData } from "./pipeline";
-import type { ProfilePoint, Surface } from "./types";
+import { cacheSlotUtc, hourHasData, soundingAvailable } from "./pipeline";
+import type { AromeResponse, ProfilePoint, Surface } from "./types";
 
 describe("cacheSlotUtc", () => {
   it("floors to the 3-hour slot by default", () => {
@@ -46,5 +46,24 @@ describe("hourHasData", () => {
   it("drops an hour that is null everywhere", () => {
     expect(hourHasData(emptySurface, [emptyPoint, { ...emptyPoint, z: 2000 }])).toBe(false);
     expect(hourHasData(emptySurface, [])).toBe(false);
+  });
+});
+
+describe("soundingAvailable", () => {
+  const data = (profile: ProfilePoint[]): AromeResponse =>
+    ({
+      hours: [{ time: "2026-08-31T12:00:00+02:00", surface: emptySurface, profile }],
+    }) as AromeResponse;
+
+  it("is true when the profile carries isobaric points", () => {
+    const iso = { ...emptyPoint, src: "p850" };
+    expect(soundingAvailable(data([emptyPoint, iso]))).toBe(true);
+  });
+
+  it("is false for near-ground-only models (no p* source)", () => {
+    const agl = { ...emptyPoint, src: "h80" };
+    const surface = { ...emptyPoint, src: "h2" };
+    expect(soundingAvailable(data([surface, agl]))).toBe(false);
+    expect(soundingAvailable(data([]))).toBe(false);
   });
 });

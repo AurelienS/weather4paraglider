@@ -8,12 +8,15 @@ import {
 import { BoardHead } from "./components/BoardHead";
 import { CompareBoard } from "./components/CompareBoard";
 import { Guide } from "./components/Guide";
+import { Meteogram } from "./components/Meteogram";
 import { PageNav, type Page } from "./components/PageNav";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
 import { groupByDay, hourLabel, utcSlot } from "./lib/format";
+import { soundingAvailable } from "./api/pipeline";
+import { meteoHoursForDay } from "./lib/meteogram";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
 import { useIsMobile } from "./lib/useIsMobile";
 import { useStore } from "./stores";
@@ -182,6 +185,12 @@ export default function App() {
   );
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
   const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
+  // the meteogram spans the whole 24 h of the selected day, not just the
+  // 07:00–22:00 display window
+  const meteoHours = useMemo(
+    () => (data && activeDay ? meteoHoursForDay(data.hours, activeDay) : []),
+    [data, activeDay],
+  );
   const hour =
     dayHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? dayHours[0];
 
@@ -337,6 +346,14 @@ export default function App() {
                   </button>
                   <button
                     type="button"
+                    className={view === "meteogram" ? "is-on" : undefined}
+                    onClick={() => setView("meteogram")}
+                  >
+                    {t.viewMeteogram}
+                    <span className="beta-tag">beta</span>
+                  </button>
+                  <button
+                    type="button"
                     className={view === "sounding" ? "is-on" : undefined}
                     onClick={() => setView("sounding")}
                   >
@@ -368,6 +385,18 @@ export default function App() {
                     zMax={Z_MAX_M}
                     compact={isMobile}
                   />
+                ) : view === "meteogram" ? (
+                  meteoHours.length > 0 ? (
+                    <Meteogram
+                      hours={meteoHours}
+                      elevationM={data.modelElevationM}
+                      compact={isMobile}
+                    />
+                  ) : (
+                    <p className="board-card-note">{t.noDataDay}</p>
+                  )
+                ) : !soundingAvailable(data) ? (
+                  <p className="board-card-note">{t.soundingUnavailable}</p>
                 ) : hour ? (
                   <>
                     <SurfaceStats

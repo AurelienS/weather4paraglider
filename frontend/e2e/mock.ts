@@ -51,7 +51,7 @@ function valueFor(v: string, hour: number): number {
   if (pr) return Math.round((15 - (GEO_HEIGHTS[pr[1]] ?? 0) * 0.0065) * 10) / 10;
   if (/^dew_point_\d+hPa$/.test(v)) return -3;
   if (/^relative_humidity_\d+hPa$/.test(v)) return 55;
-  if (/^cloud_cover_\d+hPa$/.test(v)) return 10;
+  if (/^cloud_cover_\d+hPa$/.test(v)) return 60;
   const ws = /^wind_speed_(\d+)hPa$/.exec(v);
   if (ws) return Math.round((12 + (1000 - Number(ws[1])) * 0.02) * 10) / 10;
   if (/^wind_direction_\d+hPa$/.test(v)) return 245;

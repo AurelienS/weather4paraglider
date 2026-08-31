@@ -98,16 +98,18 @@ export type TimeWindow = {
 
 export function resolveWindow(nowMs: number = Date.now(), days = 3): TimeWindow {
   const startParts = parisParts(nowMs);
-  const startPseudo = Date.UTC(startParts.y, startParts.m - 1, startParts.d, 7, 0);
+  // full days (00:00–23:00): the meteogram spans 24 h; the windgram and the
+  // sounding still narrow their own display to 07:00–22:00 downstream
+  const startPseudo = Date.UTC(startParts.y, startParts.m - 1, startParts.d, 0, 0);
   const start = startPseudo - parisOffsetMs(startPseudo);
   const endParts = parisParts(nowMs + (days - 1) * 86_400_000);
-  const endPseudo = Date.UTC(endParts.y, endParts.m - 1, endParts.d, 22, 0);
+  const endPseudo = Date.UTC(endParts.y, endParts.m - 1, endParts.d, 23, 0);
   const end = endPseudo - parisOffsetMs(endPseudo);
   return {
     start,
     end,
-    fromISO: `${naiveISO(startParts, 7, 0)}:00${offsetString(startPseudo - start)}`,
-    toISO: `${naiveISO(endParts, 22, 0)}:00${offsetString(endPseudo - end)}`,
+    fromISO: `${naiveISO(startParts, 0, 0)}:00${offsetString(startPseudo - start)}`,
+    toISO: `${naiveISO(endParts, 23, 0)}:00${offsetString(endPseudo - end)}`,
   };
 }
 
@@ -253,6 +255,16 @@ export function hourHasData(surface: Surface, profile: ProfilePoint[]): boolean 
       p.dir != null ||
       p.cloud != null,
   );
+}
+
+/**
+ * True when the payload carries isobaric levels (profile points marked
+ * `p<pressure>` by the pipeline). Near-ground-only models (AROME HD, AROME
+ * 15-min nowcast, MeteoSwiss ICON CH1) have none: the sounding cannot draw
+ * upper-air curves and must show a placeholder instead.
+ */
+export function soundingAvailable(data: AromeResponse): boolean {
+  return data.hours.some((h) => h.profile.some((p) => p.src.startsWith("p")));
 }
 
 export function assembleResponse(

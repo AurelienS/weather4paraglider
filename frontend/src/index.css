@@ -1032,6 +1032,8 @@ select optgroup {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  /* same breathing room below the header border on every page */
+  margin-top: 18px;
   margin-bottom: 12px;
 }
 
@@ -1060,6 +1062,20 @@ select optgroup {
 .seg button.is-on {
   background: var(--hover);
   color: var(--text);
+}
+
+/* small red tag on views that are still experimental */
+.beta-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px 2px;
+  border-radius: 999px;
+  background: #b3402f;
+  color: #fff;
+  font: 700 0.58rem/1.3 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: 1px;
 }
 
 .pick {
@@ -1455,6 +1471,129 @@ select optgroup {
   width: 100%;
   min-width: 720px;
   height: auto;
+}
+
+/* meteogram: meteoblue-style stacked surface panels */
+.meteo {
+  margin: 0;
+  min-width: 720px;
+}
+.meteo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.meteo-bg {
+  fill: var(--bg-elev);
+}
+.meteo-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.meteo-t {
+  fill: var(--muted);
+  font: 500 10px var(--sans);
+  text-anchor: middle;
+}
+.meteo-tx {
+  fill: var(--text);
+  font: 600 10.5px var(--sans);
+  text-anchor: middle;
+}
+.meteo-tx-l {
+  text-anchor: end;
+}
+.meteo-unit {
+  fill: var(--muted);
+  font: 600 9px var(--sans);
+  text-anchor: middle;
+}
+.meteo-val {
+  fill: var(--text);
+  font: 600 10px var(--sans);
+  text-anchor: middle;
+}
+.meteo-val-r {
+  fill: var(--accent);
+}
+.meteo-val-t {
+  fill: #d95f4b;
+}
+.meteo-val-w {
+  fill: var(--ok);
+}
+.meteo-cloud {
+  fill: var(--muted);
+}
+.meteo-precip {
+  fill: var(--accent);
+  stroke: var(--bg-elev);
+  stroke-width: 0.5;
+}
+.meteo-cbl {
+  fill: none;
+  stroke: var(--focus);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.meteo-temp {
+  fill: none;
+  stroke: #d95f4b;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.meteo-td {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+.meteo-wind {
+  fill: var(--ok);
+  opacity: 0.55;
+}
+.meteo-gust {
+  fill: none;
+  stroke: #b3742a;
+  stroke-width: 1.6;
+}
+.meteo-arrow {
+  stroke: var(--text);
+  stroke-width: 1.4;
+  fill: var(--text);
+}
+.meteo-calm {
+  fill: var(--muted);
+}
+/* baseline of the cloud panel: the 0 m line the rain bars stand on */
+.meteo-baseline {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+/* on-chart curve names, each written in its curve's color */
+.meteo-lbl {
+  font: 600 10px var(--sans);
+}
+.meteo-lbl-cloud {
+  fill: var(--muted);
+}
+.meteo-lbl-rain {
+  fill: var(--accent);
+}
+.meteo-lbl-cbl {
+  fill: var(--focus);
+}
+.meteo-lbl-temp {
+  fill: #d95f4b;
+}
+.meteo-lbl-td {
+  fill: var(--muted);
+}
+.meteo-lbl-wind {
+  fill: var(--ok);
+}
+.meteo-lbl-gust {
+  fill: #b3742a;
 }
 
 .chart-bg {

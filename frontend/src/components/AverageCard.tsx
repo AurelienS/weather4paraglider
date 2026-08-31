@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import { groupByDay, dayLabel, utcSlot } from "../lib/format";
+import { meteoHoursForDay } from "../lib/meteogram";
 import { interpolate } from "../lib/i18n";
 import type { AromeResponse } from "../api/types";
+import { soundingAvailable } from "../api/pipeline";
 import { useI18n } from "../i18nContext";
+import type { View } from "../stores/types";
+import { Meteogram } from "./Meteogram";
 import { Sounding } from "./Sounding";
 import { SurfaceStats } from "./SurfaceStats";
 import { Windgram } from "./Windgram";
@@ -14,7 +18,7 @@ type Props = {
   count: number;
   dayKey: string | null;
   hourTime: string | null;
-  view: "windgram" | "sounding";
+  view: View;
   zMax: number;
   compact: boolean;
 };
@@ -42,6 +46,18 @@ export function AverageCard({ data, count, dayKey, hourTime, view, zMax, compact
         ) : (
           <p className="board-card-note">{t.noDataDay}</p>
         )
+      ) : view === "meteogram" ? (
+        meteoHoursForDay(data.hours, effDay ?? "").length > 0 ? (
+          <Meteogram
+            hours={meteoHoursForDay(data.hours, effDay ?? "")}
+            elevationM={data.modelElevationM}
+            compact={compact}
+          />
+        ) : (
+          <p className="board-card-note">{t.noDataDay}</p>
+        )
+      ) : !soundingAvailable(data) ? (
+        <p className="board-card-note">{t.soundingUnavailable}</p>
       ) : hour ? (
         <>
           <SurfaceStats hour={hour} elevationM={data.modelElevationM} />

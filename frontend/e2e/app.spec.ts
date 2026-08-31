@@ -494,6 +494,51 @@ test("sounding labels the dry adiabat and the isotherms", async ({ page }) => {
   await expect(page.locator(".sounding text.line-label:text-is('-20°')")).toBeVisible();
 });
 
+test("the meteogram tab draws the day in one shared plot", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  await expect(page.locator(".meteo-svg")).toBeVisible();
+
+  // continuous cloud bands (closed soft paths), not per-hour bars
+  const clouds = await page.locator("path.meteo-cloud").count();
+  expect(clouds).toBeGreaterThanOrEqual(1);
+  const d = await page.locator("path.meteo-cloud").first().getAttribute("d");
+  expect(d).toContain("Q"); // rounded corners, both ends included
+  expect(d).toMatch(/Z$/);
+
+  // the yellow convective-top line rides the real altitude scale
+  await expect(page.locator(".meteo-cbl")).toHaveCount(1);
+
+  // the curve names sit in the right margin, never overlapping
+  const labels = await page.locator(".meteo-svg .meteo-lbl").evaluateAll((els) =>
+    els
+      .filter((el) => Number(el.getAttribute("x")) > 600)
+      .map((el) => Number(el.getAttribute("y")))
+      .sort((a, b) => a - b),
+  );
+  expect(labels.length).toBeGreaterThanOrEqual(3);
+  for (let i = 1; i < labels.length; i++) {
+    expect(labels[i]! - labels[i - 1]!).toBeGreaterThanOrEqual(12);
+  }
+});
+
+test("near-ground-only models show a placeholder instead of a sounding", async ({ page }) => {
+  await mockOpenMeteo(page);
+  // AROME France HD publishes no isobaric levels: no sounding possible
+  await page.goto("/?lat=45.945&lon=6.71&model=arome_france_hd");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(page.locator(".board-card-note")).toContainText(
+    "no isobaric levels",
+  );
+  await expect(page.locator(".sounding")).toHaveCount(0);
+  // the other views keep working for the same model
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  await expect(page.locator(".meteo-svg")).toBeVisible();
+});
+
 test("when Photon is down the search falls back to the Open-Meteo geocoder", async ({ page }) => {
   await mockOpenMeteo(page);
   await mockPhotonDown(page);
