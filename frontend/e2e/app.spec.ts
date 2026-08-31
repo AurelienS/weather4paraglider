@@ -134,6 +134,44 @@ test("model selection switches the forecast window and URL", async ({ page }) =>
   expect(om.calls()).toBe(before);
 });
 
+test("switching models keeps the selected day and hour when they exist", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  const dayTabs = page.locator('.seg[aria-label="Day"] button');
+  await expect(dayTabs).toHaveCount(3);
+  await dayTabs.nth(1).click();
+  await expect(dayTabs.nth(1)).toHaveClass(/is-on/);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  const hourPick = page.getByLabel("Hour");
+  await hourPick.selectOption({ label: "14:00" });
+  await expect(hourPick.locator("option:checked")).toHaveText("14:00");
+
+  await page.getByLabel("Model").selectOption("arpege_europe");
+  await expect(page.locator(".meta")).toContainText("arpege_europe");
+  // tomorrow and 14:00 exist in ARPEGE: the selection survives the switch
+  await expect(dayTabs).toHaveCount(4);
+  await expect(dayTabs.nth(1)).toHaveClass(/is-on/);
+  await expect(hourPick.locator("option:checked")).toHaveText("14:00");
+});
+
+test("switching models resets the day when the new model lacks it", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  const dayTabs = page.locator('.seg[aria-label="Day"] button');
+  await expect(dayTabs).toHaveCount(3);
+  await dayTabs.nth(2).click();
+  await expect(dayTabs.nth(2)).toHaveClass(/is-on/);
+
+  await page.getByLabel("Model").selectOption("arome_france_hd");
+  await expect(page.locator(".meta")).toContainText("0.01°");
+  // AROME HD only covers 2 days: the third day falls back to today
+  await expect(dayTabs).toHaveCount(2);
+  await expect(dayTabs.nth(0)).toHaveClass(/is-on/);
+});
+
 test("the model dropdown groups models by use case", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");

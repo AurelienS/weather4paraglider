@@ -107,11 +107,11 @@ export function slotsForDay(hours: Hour[]): HourSlot[] {
   }));
 }
 
-export function groupByDay(
-  hours: Hour[],
+export function groupByDay<T extends { time: string }>(
+  hours: readonly T[],
   lang: Lang = "en",
-): { key: string; label: string; hours: Hour[] }[] {
-  const map = new Map<string, Hour[]>();
+): { key: string; label: string; hours: T[] }[] {
+  const map = new Map<string, T[]>();
   for (const hour of hours) {
     if (!isDisplayHour(hour.time)) continue;
     const key = dayKey(hour.time);
@@ -151,7 +151,7 @@ export function utcSlot(iso: string): string {
   });
 }
 
-export function pickDefaultHour(hours: Hour[]): number {
+export function pickDefaultHour(hours: readonly { time: string }[]): number {
   if (hours.length === 0) return 0;
   const now = Date.now();
   let best = 0;
@@ -162,6 +162,33 @@ export function pickDefaultHour(hours: Hour[]): number {
     else break;
   }
   return best;
+}
+
+export type DaySelection = { day: string | null; hourIdx: number };
+
+export function selectionAfterLoad(
+  hours: readonly { time: string }[],
+  prevDay: string | null,
+  prevHourTime: string | null,
+): DaySelection {
+  if (hours.length === 0) return { day: null, hourIdx: 0 };
+  const kept =
+    prevDay == null ? undefined : groupByDay(hours).find((d) => d.key === prevDay);
+  if (!kept) {
+    const idx = pickDefaultHour(hours);
+    const chosen = hours[idx];
+    return { day: chosen ? dayKey(chosen.time) : null, hourIdx: idx };
+  }
+  let target = kept.hours[0];
+  if (prevHourTime != null) {
+    const at = new Date(prevHourTime).getTime();
+    for (const h of kept.hours) {
+      if (new Date(h.time).getTime() <= at) target = h;
+      else break;
+    }
+  }
+  const hourIdx = target ? hours.findIndex((h) => h.time === target.time) : -1;
+  return { day: kept.key, hourIdx: hourIdx >= 0 ? hourIdx : 0 };
 }
 
 export function windTone(kmh: number | null | undefined): "calm" | "ok" | "brisk" | "strong" | "hard" {

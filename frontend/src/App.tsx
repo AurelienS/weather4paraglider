@@ -18,10 +18,9 @@ import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
 import {
   DEMO_POINT,
-  dayKey,
   groupByDay,
   hourLabel,
-  pickDefaultHour,
+  selectionAfterLoad,
   utcSlot,
 } from "./lib/format";
 import { loadFavorites, storeFavorites, type Favorite } from "./lib/favorites";
@@ -150,6 +149,9 @@ export default function App() {
   const [data, setData] = useState<AromeResponse | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [hourIdx, setHourIdx] = useState(0);
+  const dayRef = useRef<string | null>(null);
+  const hourTimeRef = useRef<string | null>(null);
+  const carryRef = useRef(false);
   const [activeZ, setActiveZ] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -248,15 +250,18 @@ export default function App() {
     const ac = new AbortController();
     const force = forceRef.current;
     forceRef.current = false;
+    const carry = carryRef.current;
+    carryRef.current = false;
 
     fetchArome(point.lat, point.lon, modelId, { force, signal: ac.signal, lang })
       .then((payload) => {
         if (ac.signal.aborted) return;
-        const idx = pickDefaultHour(payload.hours);
-        const chosen = payload.hours[idx];
+        const next = carry
+          ? selectionAfterLoad(payload.hours, dayRef.current, hourTimeRef.current)
+          : selectionAfterLoad(payload.hours, null, null);
         setData(payload);
-        setHourIdx(idx);
-        setDay(chosen ? dayKey(chosen.time) : null);
+        setHourIdx(next.hourIdx);
+        setDay(next.day);
         setActiveZ(null);
       })
       .catch((err: unknown) => {
@@ -306,6 +311,7 @@ export default function App() {
 
   function selectModel(next: ModelId) {
     if (next === modelId) return;
+    carryRef.current = true;
     setLoading(true);
     setError(null);
     setModelId(next);
@@ -319,6 +325,11 @@ export default function App() {
   const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
   const hour = dayHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? dayHours[0];
 
+  useEffect(() => {
+    dayRef.current = day;
+    hourTimeRef.current = hour?.time ?? null;
+  });
+
   function selectDay(key: string) {
     setDay(key);
     const first = days.find((d) => d.key === key)?.hours[0];
@@ -330,6 +341,7 @@ export default function App() {
   function refresh() {
     setLoading(true);
     setError(null);
+    carryRef.current = true;
     forceRef.current = true;
     forcePinsRef.current = true;
     setBump((n) => n + 1);
