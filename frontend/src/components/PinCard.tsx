@@ -1,21 +1,16 @@
 import { useMemo, useState } from "react";
-import type { AromeResponse } from "../api/types";
 import { groupByDay } from "../lib/format";
 import { interpolate } from "../lib/i18n";
 import { useI18n } from "../i18nContext";
 import { pinKey, type Pin } from "../lib/pins";
+import type { EntryState } from "../stores/types";
 import { Sounding } from "./Sounding";
 import { SurfaceStats } from "./SurfaceStats";
 import { Windgram } from "./Windgram";
 
-export type PinState =
-  | { status: "loading" }
-  | { status: "ready"; data: AromeResponse }
-  | { status: "error"; message: string };
-
 type Props = {
   pin: Pin;
-  state: PinState | undefined;
+  state: EntryState | undefined;
   /** Global day key selected in the main toolbar. */
   dayKey: string | null;
   /** Time of the hour selected in the main toolbar (sounding sync). */
@@ -24,9 +19,26 @@ type Props = {
   zMax: number;
   compact: boolean;
   onRemove: () => void;
+  /** Reorder the board: one slot up (-1) or down (+1). */
+  onMove: (delta: number) => void;
+  /** Boundaries: hide the arrow that cannot apply. */
+  showUp: boolean;
+  showDown: boolean;
 };
 
-export function PinCard({ pin, state, dayKey, hourTime, view, zMax, compact, onRemove }: Props) {
+export function PinCard({
+  pin,
+  state,
+  dayKey,
+  hourTime,
+  view,
+  zMax,
+  compact,
+  onRemove,
+  onMove,
+  showUp,
+  showDown,
+}: Props) {
   const { t, lang } = useI18n();
   const [activeZ, setActiveZ] = useState<number | null>(null);
   const label = pin.name ?? `${pin.lat.toFixed(4)}, ${pin.lon.toFixed(4)}`;
@@ -43,14 +55,36 @@ export function PinCard({ pin, state, dayKey, hourTime, view, zMax, compact, onR
     <section className="board-card" aria-label={interpolate(t.pinAria, { label })}>
       <div className="board-card-head">
         <span className="board-card-name">{label}</span>
-        <button
-          type="button"
-          className="board-card-remove"
-          aria-label={interpolate(t.pinRemoveAria, { label })}
-          onClick={onRemove}
-        >
-          ✕
-        </button>
+        <span className="board-card-actions">
+          {showUp ? (
+            <button
+              type="button"
+              className="board-card-move"
+              aria-label={interpolate(t.pinUpAria, { label })}
+              onClick={() => onMove(-1)}
+            >
+              ↑
+            </button>
+          ) : null}
+          {showDown ? (
+            <button
+              type="button"
+              className="board-card-move"
+              aria-label={interpolate(t.pinDownAria, { label })}
+              onClick={() => onMove(+1)}
+            >
+              ↓
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="board-card-remove"
+            aria-label={interpolate(t.pinRemoveAria, { label })}
+            onClick={onRemove}
+          >
+            ✕
+          </button>
+        </span>
       </div>
       {state == null || state.status === "loading" ? (
         <p className="board-card-note">{t.loading}</p>

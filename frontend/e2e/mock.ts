@@ -188,6 +188,51 @@ export async function mockPhoton(page: Page): Promise<void> {
   );
 }
 
+/** Photon refuses connections (outage): the search must fall back to the
+ * Open-Meteo geocoder. */
+export async function mockPhotonDown(page: Page): Promise<void> {
+  await page.route("**/photon.komoot.io/**", (route: Route) =>
+    route.abort("connectionrefused"),
+  );
+}
+
+export async function mockOpenMeteoGeocode(page: Page): Promise<{ calls: () => number }> {
+  let count = 0;
+  await page.route("**/geocoding-api.open-meteo.com/**", (route: Route) => {
+    count += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: [
+          {
+            name: "Chamonix-Mont-Blanc",
+            latitude: 45.9231,
+            longitude: 6.8692,
+            admin1: "Auvergne-Rhône-Alpes",
+            country: "France",
+          },
+          {
+            name: "Annecy",
+            latitude: 45.8992,
+            longitude: 6.1294,
+            admin1: "Auvergne-Rhône-Alpes",
+            country: "France",
+          },
+          // outside every model domain: must be filtered out
+          {
+            name: "Nouméa",
+            latitude: -22.2758,
+            longitude: 166.458,
+            country: "New Caledonia",
+          },
+        ],
+      }),
+    });
+  });
+  return { calls: () => count };
+}
+
 export async function blockTiles(page: Page): Promise<void> {
   await page.route("**/tile.openstreetmap.org/**", (route: Route) => route.abort());
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { searchPlaces, type Place } from "../lib/geocode";
+import { interpolate } from "../lib/i18n";
 import type { ModelDef } from "../api/models";
 import { useI18n } from "../i18nContext";
 
@@ -7,6 +8,9 @@ type Props = {
   disabled: boolean;
   model: ModelDef;
   onPick: (place: Place) => void;
+  /** Optional second action per result: add the place to the compare board
+   * instead of loading it. The menu stays open so several can be added. */
+  onCompare?: (pin: { lat: number; lon: number; name: string }) => void;
   /** DOM id for the input (must be unique per page). */
   id?: string;
   /** Visible uppercase label; omit to render only the input. */
@@ -21,6 +25,7 @@ export function PlaceSearch({
   disabled,
   model,
   onPick,
+  onCompare,
   id = "place",
   label,
   ariaLabel,
@@ -83,6 +88,14 @@ export function PlaceSearch({
     setQuery("");
     setResults([]);
     onPick(place);
+  }
+
+  function compare(place: Place) {
+    onCompare?.({
+      lat: place.lat,
+      lon: place.lon,
+      name: place.detail ? `${place.label}, ${place.detail}` : place.label,
+    });
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -175,6 +188,17 @@ export function PlaceSearch({
                   <span className="pl-detail">{place.detail}</span>
                 ) : null}
               </button>
+              {onCompare ? (
+                <button
+                  type="button"
+                  className="place-compare"
+                  aria-label={interpolate(t.addCompareAria, { label: place.label })}
+                  title={t.addCompare}
+                  onClick={() => compare(place)}
+                >
+                  +
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

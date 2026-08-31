@@ -2,6 +2,7 @@
 import { loadFavorites, storeFavorites, type Favorite } from "../lib/favorites";
 import { storeLang, loadLang, type Lang } from "../lib/i18n";
 import { applyTheme, loadTheme, otherTheme, storeTheme, type Theme } from "../lib/theme";
+import { findPlaceEntry } from "../lib/compare";
 import { pinKey } from "../lib/pins";
 import type { SliceCreator } from "./index";
 
@@ -38,15 +39,15 @@ export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
     storeLang(next);
     set({ lang: next });
     get().loadMain();
-    get().loadPins();
+    get().loadEntries();
   },
 
   addFavorite: () => {
-    const { point, place, pins, favs } = get();
+    const { point, place, entries, favs } = get();
     const key = `${point.lat.toFixed(4)},${point.lon.toFixed(4)}`;
     if (favs.some((f) => `${f.lat.toFixed(4)},${f.lon.toFixed(4)}` === key)) return;
-    // reuse the pin's stored name when the place label is not known (reload)
-    const mainPinName = pins.find((p) => pinKey(p) === pinKey(point))?.name;
+    // reuse the board's stored name when the place label is not known (reload)
+    const mainPinName = findPlaceEntry(entries, pinKey(point))?.name;
     const next: Favorite[] = [
       {
         lat: point.lat,

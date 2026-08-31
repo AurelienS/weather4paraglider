@@ -38,7 +38,8 @@ beforeEach(() => {
     lang: "en",
     favs: [],
     theme: "dark",
-    pins: [],
+    entries: [],
+    entryStates: {},
   });
 });
 
@@ -53,12 +54,12 @@ describe("prefs.addFavorite", () => {
   test("falls back to the board pin name, then bare coordinates", () => {
     useStore.setState({
       place: null,
-      pins: [{ lat: 45.8992, lon: 6.1294, name: "Pin name" }],
+      entries: [{ kind: "place", lat: 45.8992, lon: 6.1294, name: "Pin name" }],
     });
     useStore.getState().addFavorite();
     expect(useStore.getState().favs[0]?.label).toBe("Pin name");
 
-    useStore.setState({ pins: [], favs: [] });
+    useStore.setState({ entries: [], favs: [] });
     useStore.getState().addFavorite();
     expect(useStore.getState().favs[0]?.label).toBe("45.8992, 6.1294");
   });

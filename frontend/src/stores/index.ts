@@ -36,7 +36,7 @@ export const useStore = create<RootState>()(
       point: BOOTSTRAP.point,
       modelId: BOOTSTRAP.modelId,
       compare: BOOTSTRAP.compare,
-      pins: BOOTSTRAP.pins,
+      entries: BOOTSTRAP.entries,
     }),
     { name: "w4p", enabled: import.meta.env.DEV },
   ),

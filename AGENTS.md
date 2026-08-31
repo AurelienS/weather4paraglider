@@ -45,6 +45,8 @@ Never commit with failing `npm run lint`, `npm run build` or `npm run e2e`.
     `status` option to simulate 429/5xx, `noDataFor` option to simulate
     Open-Meteo's "No data is available for this location" for a model id.
   - `mockPhoton(page)` — geocoding / reverse geocoding.
+  - `mockPhotonDown(page)` + `mockOpenMeteoGeocode(page)` — the search falls
+    back to the Open-Meteo geocoder when Photon is unreachable.
   - `blockTiles(page)` — call it in `beforeEach` (OSM tiles blocked).
 - Count calls (`const om = await mockOpenMeteo(page)` then `om.calls()`;
   `om.urls()` returns the requested URLs) to test caching and forcing.

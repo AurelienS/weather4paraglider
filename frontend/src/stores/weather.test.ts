@@ -74,8 +74,8 @@ beforeEach(() => {
     activeZ: null,
     view: "windgram",
     compare: false,
-    pins: [],
-    pinStates: {},
+    entries: [],
+    entryStates: {},
   });
 });
 
@@ -178,8 +178,11 @@ describe("weather.selectModel", () => {
 });
 
 describe("weather.refresh", () => {
-  test("forces the main load and the pin loads", async () => {
-    useStore.setState({ compare: true, pins: [{ lat: 46, lon: 7 }] });
+  test("forces the main load and the board loads", async () => {
+    useStore.setState({
+      compare: true,
+      entries: [{ kind: "place", lat: 46, lon: 7 }],
+    });
     useStore.getState().refresh();
     await flush();
 
@@ -195,37 +198,5 @@ describe("weather.refresh", () => {
       "arome_france",
       expect.objectContaining({ force: true }),
     );
-  });
-});
-
-describe("weather.loadPins", () => {
-  test("fills pinStates with ready payloads in compare mode", async () => {
-    useStore.setState({ compare: true, pins: [{ lat: 46, lon: 7 }, { lat: 46.5, lon: 7.5 }] });
-    useStore.getState().loadPins();
-    await flush();
-
-    const states = useStore.getState().pinStates;
-    expect(Object.keys(states)).toHaveLength(2);
-    expect(states["46.0000,7.0000"]?.status).toBe("ready");
-    expect(states["46.5000,7.5000"]?.status).toBe("ready");
-  });
-
-  test("a failing pin stores an inline error, not a global banner", async () => {
-    useStore.setState({ compare: true, pins: [{ lat: 46, lon: 7 }] });
-    fetchAromeMock.mockRejectedValueOnce(new Error("quota"));
-    useStore.getState().loadPins();
-    await flush();
-
-    const states = useStore.getState().pinStates;
-    expect(states["46.0000,7.0000"]).toEqual({ status: "error", message: "quota" });
-    expect(useStore.getState().error).toBeNull();
-  });
-
-  test("does nothing outside compare mode", async () => {
-    useStore.setState({ pins: [{ lat: 46, lon: 7 }] });
-    useStore.getState().loadPins();
-    await flush();
-    expect(fetchAromeMock).not.toHaveBeenCalled();
-    expect(useStore.getState().pinStates).toEqual({});
   });
 });

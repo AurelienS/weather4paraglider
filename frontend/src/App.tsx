@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MODELS, isModelId } from "./api/models";
 import { CompareBoard } from "./components/CompareBoard";
 import { Guide } from "./components/Guide";
@@ -7,6 +7,7 @@ import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
 import { groupByDay, hourLabel, utcSlot } from "./lib/format";
+import { findPlaceEntry } from "./lib/compare";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
 import { pinKey } from "./lib/pins";
 import { useIsMobile } from "./lib/useIsMobile";
@@ -55,7 +56,7 @@ export default function App() {
   const selectHourTime = useStore((s) => s.selectHourTime);
 
   const compare = useStore((s) => s.compare);
-  const pins = useStore((s) => s.pins);
+  const entries = useStore((s) => s.entries);
 
   const favs = useStore((s) => s.favs);
   const theme = useStore((s) => s.theme);
@@ -65,6 +66,9 @@ export default function App() {
   const [guide, setGuide] = useState(
     () => new URLSearchParams(window.location.search).get("guide") === "1",
   );
+  // tracks the compare mode already reflected in the history, so the URL
+  // effect pushes a new entry only on a real mode transition
+  const prevCompare = useRef(compare);
 
   const MODEL_GROUP_LABEL: Record<ModelGroup, string> = {
     nowcast: t.modelGroupNowcast,
@@ -75,7 +79,11 @@ export default function App() {
 
   useEffect(() => {
     function onPop() {
-      setGuide(new URLSearchParams(window.location.search).get("guide") === "1");
+      const q = new URLSearchParams(window.location.search);
+      setGuide(q.get("guide") === "1");
+      // the history entry already carries this mode: don't push again
+      prevCompare.current = q.get("compare") === "1";
+      useStore.getState().syncCompareFromUrl(prevCompare.current, q.get("pins"));
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -87,14 +95,27 @@ export default function App() {
     const store = useStore.getState();
     store.ensurePlace();
     store.loadMain();
-    store.loadPins();
+    store.loadEntries();
   }, []);
 
-  // keep the URL and the compare board in sync with the state
+  // keep the URL and the compare board in sync with the state; entering or
+  // leaving compare mode is a navigation (pushState), so the browser back
+  // button leaves the compare page
   useEffect(() => {
-    writeStateToUrl(point, modelId, compare, pins);
-    storeCompare(compare, pins);
-  }, [point, modelId, compare, pins]);
+    const entering = compare !== prevCompare.current;
+    prevCompare.current = compare;
+    if (entering) {
+      const url = new URL(window.location.href);
+      if (compare) url.searchParams.set("compare", "1");
+      else {
+        url.searchParams.delete("compare");
+        url.searchParams.delete("pins");
+      }
+      window.history.pushState(null, "", url);
+    }
+    writeStateToUrl(point, modelId, compare, entries);
+    storeCompare(compare, entries);
+  }, [point, modelId, compare, entries]);
 
   function openGuide() {
     const url = new URL(window.location.href);
@@ -120,8 +141,8 @@ export default function App() {
   const placeSaved = favs.some((f) => `${f.lat.toFixed(4)},${f.lon.toFixed(4)}` === favKey);
 
   const mainKey = pinKey(point);
-  // reuse the pin's stored name when the place label is not known (e.g. reload)
-  const mainPinName = pins.find((p) => pinKey(p) === mainKey)?.name;
+  // reuse the board's stored name when the place label is not known (reload)
+  const mainPinName = findPlaceEntry(entries, mainKey)?.name;
 
   const days = useMemo(
     () => (data ? groupByDay(data.hours, lang) : []),
@@ -187,7 +208,15 @@ export default function App() {
               </button>
             </div>
           </div>
-          <SiteForm />
+          {compare ? (
+            <div className="compare-top">
+              <button type="button" className="btn" onClick={() => useStore.getState().toggleCompare(false)}>
+                ← {t.compareBack}
+              </button>
+            </div>
+          ) : (
+            <SiteForm />
+          )}
         </div>
       </header>
 

@@ -487,6 +487,16 @@ select optgroup {
   position: relative;
 }
 
+.compare-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hist-menu .fav-list {
+  min-width: 230px;
+}
+
 .site-form-place-row {
   display: flex;
   align-items: flex-end;
@@ -554,6 +564,39 @@ select optgroup {
 
 .place-menu button.is-active {
   background: var(--hover);
+}
+
+.place-menu li {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.place-menu li > button[role="option"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-menu .place-compare {
+  flex: none;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.place-menu .place-compare:hover,
+.place-menu .place-compare:focus-visible {
+  background: var(--hover);
+  color: var(--text);
 }
 
 .place-menu .pl-label {
@@ -972,6 +1015,12 @@ select optgroup {
   margin-left: auto;
 }
 
+.place-search.is-compact {
+  /* the compact input is 230px wide: keep the wrapper at the same width so
+   * the board tools row has no dead space next to it */
+  flex: 0 0 230px;
+}
+
 .place-search.is-compact input {
   width: 230px;
   padding: 6px 9px;
@@ -1018,6 +1067,12 @@ select optgroup {
   font: 600 0.95rem var(--sans);
 }
 
+.board-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.board-card-move,
 .board-card-remove {
   appearance: none;
   border: 1px solid var(--line);
@@ -1030,6 +1085,7 @@ select optgroup {
   cursor: pointer;
 }
 
+.board-card-move:hover,
 .board-card-remove:hover {
   color: var(--text);
   border-color: var(--muted);

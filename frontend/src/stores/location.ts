@@ -45,11 +45,9 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
   },
 
   submitPlace: (lat, lon, label) => {
-    const { point, compare } = get();
+    const { point } = get();
     const same = lat === point.lat && lon === point.lon;
     set({ loading: true, error: null, place: label ?? null });
-    // in compare mode every loaded place joins the board
-    if (compare) get().addPinToBoard({ lat, lon, name: label ?? undefined });
     if (!same) {
       set({ point: { lat, lon } });
       get().ensurePlace();
@@ -62,12 +60,12 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
       point: { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon },
       place: null,
       modelId: DEFAULT_MODEL,
-      compare: false,
-      pins: [],
       day: null,
       hourIdx: 0,
       view: "windgram",
     });
+    // leaving compare discards the board and aborts its batch
+    if (get().compare) get().toggleCompare(false);
     get().ensurePlace();
     get().loadMain();
   },

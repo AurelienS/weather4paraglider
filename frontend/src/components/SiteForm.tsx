@@ -5,21 +5,22 @@ import { modelById } from "../api/models";
 import { useI18n } from "../i18nContext";
 import { useStore } from "../stores";
 import { FavoritesMenu } from "./FavoritesMenu";
+import { HistoryMenu } from "./HistoryMenu";
 import { MapPicker } from "./MapPicker";
 import { PlaceSearch } from "./PlaceSearch";
 
 /** The header form, wired directly to the store: place search, map picking,
- * favorites, refresh and the compare switch. */
+ * favorites, refresh and the entry to the compare page. */
 export function SiteForm() {
   const { t } = useI18n();
   const lat = useStore((s) => s.point.lat);
   const lon = useStore((s) => s.point.lon);
   const modelId = useStore((s) => s.modelId);
   const loading = useStore((s) => s.loading);
-  const compare = useStore((s) => s.compare);
   const favs = useStore((s) => s.favs);
   const submitPlace = useStore((s) => s.submitPlace);
   const toggleCompare = useStore((s) => s.toggleCompare);
+  const addPlaceToBoard = useStore((s) => s.addPlaceToBoard);
   const removeFavorite = useStore((s) => s.removeFavorite);
   const refresh = useStore((s) => s.refresh);
   const [mapOpen, setMapOpen] = useState(false);
@@ -35,7 +36,12 @@ export function SiteForm() {
   return (
     <div className="site-form">
       <div className="site-form-place-row">
-        <PlaceSearch disabled={loading} model={modelById(modelId)} onPick={pickPlace} />
+        <PlaceSearch
+          disabled={loading}
+          model={modelById(modelId)}
+          onPick={pickPlace}
+          onCompare={addPlaceToBoard}
+        />
         <button
           type="button"
           className="btn"
@@ -52,6 +58,8 @@ export function SiteForm() {
           onPick={pickFavorite}
           onRemove={removeFavorite}
         />
+        {/* restoring a comparison from the home page opens the compare page */}
+        <HistoryMenu />
         <button
           type="button"
           className="btn"
@@ -60,14 +68,14 @@ export function SiteForm() {
         >
           {t.refresh}
         </button>
-        <label className="pick pick-check" title={t.compareHint}>
-          <input
-            type="checkbox"
-            checked={compare}
-            onChange={(e) => toggleCompare(e.target.checked)}
-          />
+        <button
+          type="button"
+          className="btn"
+          title={t.compareHint}
+          onClick={() => toggleCompare(true)}
+        >
           {t.compareCheck}
-        </label>
+        </button>
       </div>
       {mapOpen ? (
         <MapPicker
