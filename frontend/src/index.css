@@ -1759,23 +1759,23 @@ select optgroup {
     width: 100%;
   }
 
-  /* centered header rows on small screens: the right-hugging desktop
-     alignment leaves awkward gaps once everything stacks */
+  /* stacked header reads like a mobile app bar: title, search and tools
+     each on their own full-width, left-aligned row */
   .page-header {
-    align-items: center;
+    align-items: stretch;
   }
   .page-header-context,
   .page-header-actions {
-    justify-content: center;
+    justify-content: flex-start;
   }
   .page-header-context .board-title {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   /* the page tabs wrap onto two tidy rows instead of scrolling out of view */
   .page-nav {
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   /* toolbar wraps tighter; selects take the row */

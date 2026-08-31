@@ -302,36 +302,34 @@ test("on a phone the windgram is compact and fits without inner scrolling", asyn
   expect(parseFloat(font)).toBeGreaterThanOrEqual(12);
 });
 
-test("on a phone the header stacks, centers and never overflows", async ({ page }) => {
+test("on a phone the header stacks, left-aligns and never overflows", async ({ page }) => {
   await mockOpenMeteo(page);
   await blockTiles(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
-  const assertCenteredHeader = async () => {
+  const assertLeftHeader = async () => {
     // nothing sticks out of the viewport: no horizontal page scroll
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
-    // every header row is centered: title, search and actions share the
-    // viewport center line
-    const centers = await page.evaluate(() => {
-      const mid = (el: Element | null) => {
+    // every header row starts at the same left edge (app-bar style)
+    const lefts = await page.evaluate(() => {
+      const x = (el: Element | null) => {
         if (!el) return null;
-        const b = el.getBoundingClientRect();
-        return Math.round(b.x + b.width / 2);
+        return Math.round(el.getBoundingClientRect().x);
       };
       return {
-        viewport: Math.round(window.innerWidth / 2),
-        title: mid(document.querySelector(".board-title")),
-        search: mid(document.querySelector(".page-header-context .place-search")),
-        actions: mid(document.querySelector(".page-header-actions")),
+        header: x(document.querySelector(".page-header")),
+        title: x(document.querySelector(".board-title")),
+        search: x(document.querySelector(".page-header-context .place-search")),
+        actions: x(document.querySelector(".page-header-actions")),
       };
     });
-    expect(centers.viewport).not.toBeNull();
+    expect(lefts.header).not.toBeNull();
     for (const key of ["title", "search", "actions"] as const) {
-      if (centers[key] != null) {
-        expect(Math.abs(centers[key]! - centers.viewport!)).toBeLessThanOrEqual(2);
+      if (lefts[key] != null) {
+        expect(Math.abs(lefts[key]! - lefts.header!)).toBeLessThanOrEqual(2);
       }
     }
   };
@@ -339,17 +337,17 @@ test("on a phone the header stacks, centers and never overflows", async ({ page 
   // place page
   await page.goto("/");
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
-  await assertCenteredHeader();
+  await assertLeftHeader();
 
   // compare places: pinned place card + header controls
   await page.goto("/?compare=1&pins=45.9450,6.7100/Passy");
   await expect(page.locator(".board-card").first()).toBeVisible();
-  await assertCenteredHeader();
+  await assertLeftHeader();
 
   // compare models: model menu and average toggle wrap under the title
   await page.goto("/?compare=models&pins=model:arome_france;model:icon_d2");
   await expect(page.locator(".board-card").first()).toBeVisible();
-  await assertCenteredHeader();
+  await assertLeftHeader();
 
   // the page tabs wrap onto rows instead of scrolling out of the viewport
   const nav = await page.locator(".page-nav").evaluate((el) => ({
