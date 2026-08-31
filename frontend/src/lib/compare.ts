@@ -1,5 +1,6 @@
 import type { ModelId } from "../api/models";
-import { pinKey, type Pin } from "./pins";
+import { isModelId } from "../api/models";
+import { encodePin, parsePinSegment, pinKey, type Pin } from "./pins";
 
 /** One row of the compare board. A place compares the same model across
  * locations; a model compares one location across models. */
@@ -50,6 +51,41 @@ export function moveEntry(
 /** Only place entries travel in the `pins` URL parameter. */
 export function placeEntries(entries: CompareEntry[]): Pin[] {
   return entries.filter((e): e is Extract<CompareEntry, { kind: "place" }> => e.kind === "place");
+}
+
+/** Ids of the model entries, in board order. */
+export function modelEntries(entries: CompareEntry[]): ModelId[] {
+  return entries.flatMap((e) => (e.kind === "model" ? [e.modelId] : []));
+}
+
+const MODEL_SEGMENT = "model:";
+
+/** Serialize the whole board into the `pins` URL parameter, keeping the
+ * order: place segments as before, model segments as `model:<id>`. Plain
+ * place-only strings stay parseable, so old shared URLs keep working. */
+export function parseBoard(raw: string | null): CompareEntry[] {
+  if (!raw) return [];
+  const out: CompareEntry[] = [];
+  for (const part of raw.split(";")) {
+    if (!part) continue;
+    if (part.startsWith(MODEL_SEGMENT)) {
+      const id = part.slice(MODEL_SEGMENT.length);
+      if (isModelId(id) && out.length < MAX_ENTRIES) {
+        out.push({ kind: "model", modelId: id });
+      }
+      continue;
+    }
+    const pin = parsePinSegment(part);
+    if (pin && out.length < MAX_ENTRIES) out.push({ kind: "place", ...pin });
+  }
+  return out;
+}
+
+/** Inverse of parseBoard: the board order travels in one parameter. */
+export function encodeBoard(entries: CompareEntry[]): string {
+  return entries
+    .map((e) => (isPlaceEntry(e) ? encodePin(e) : `${MODEL_SEGMENT}${e.modelId}`))
+    .join(";");
 }
 
 export function isPlaceEntry(entry: CompareEntry): entry is Extract<CompareEntry, { kind: "place" }> {

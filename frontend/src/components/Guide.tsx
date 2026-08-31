@@ -202,15 +202,12 @@ function GramScale() {
   );
 }
 
-export function Guide({ onBack }: { onBack: () => void }) {
+export function Guide() {
   const { t } = useI18n();
   return (
     <article className="guide" aria-label={t.guideTitle}>
       <div className="guide-head">
         <h2>{t.guideTitle}</h2>
-        <button type="button" className="btn" onClick={onBack}>
-          {t.guideBack}
-        </button>
       </div>
       <p className="guide-intro">{t.guideIntro}</p>
       <section>

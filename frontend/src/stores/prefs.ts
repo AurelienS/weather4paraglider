@@ -1,5 +1,12 @@
 
-import { loadFavorites, storeFavorites, type Favorite } from "../lib/favorites";
+import {
+  loadFavorites,
+  loadRecentPlaces,
+  recordRecentPlace,
+  storeFavorites,
+  storeRecentPlaces,
+  type Favorite,
+} from "../lib/favorites";
 import { storeLang, loadLang, type Lang } from "../lib/i18n";
 import { applyTheme, loadTheme, otherTheme, storeTheme, type Theme } from "../lib/theme";
 import { findPlaceEntry } from "../lib/compare";
@@ -9,6 +16,8 @@ import type { SliceCreator } from "./index";
 export type PrefsSlice = {
   theme: Theme;
   favs: Favorite[];
+  /** Recently visited places, most recent first, shown on the main page. */
+  recentPlaces: Favorite[];
   lang: Lang;
 
   toggleTheme: () => void;
@@ -20,11 +29,14 @@ export type PrefsSlice = {
    * the bare coordinates. No-op when already saved. */
   addFavorite: () => void;
   removeFavorite: (fav: Favorite) => void;
+  /** Record a place visit (called by submitPlace). */
+  addRecentPlace: (pin: Favorite) => void;
 };
 
 export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
   theme: loadTheme(),
   favs: loadFavorites(),
+  recentPlaces: loadRecentPlaces(),
   lang: loadLang(),
 
   toggleTheme: () => {
@@ -64,5 +76,11 @@ export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
     const next = get().favs.filter((f) => f !== fav);
     storeFavorites(next);
     set({ favs: next });
+  },
+
+  addRecentPlace: (pin) => {
+    const next = recordRecentPlace(get().recentPlaces, pin);
+    storeRecentPlaces(next);
+    set({ recentPlaces: next });
   },
 });

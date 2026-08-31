@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { AromeResponse } from "../api/types";
+import type { EntryState } from "./types";
 
 vi.mock("../api/client", () => ({ fetchArome: vi.fn() }));
 
@@ -37,12 +38,14 @@ beforeEach(() => {
     point: { lat: 45.8992, lon: 6.1294 },
     place: "Annecy",
     lang: "en",
+    modelId: "arome_france",
     data: null,
     error: null,
     loading: true,
     compare: false,
     entries: [],
     entryStates: {},
+    compareMode: "place",
     history: [],
   });
 });
@@ -138,20 +141,49 @@ describe("compare.addPlaceToBoard", () => {
 });
 
 describe("compare.addModelToBoard", () => {
-  test("opens compare mode and fetches the current place for the model", async () => {
+  test("adds to the model board and fetches the current place for the model", async () => {
+    useStore.setState({ compare: true, compareMode: "model" });
     useStore.getState().addModelToBoard("arpege_europe");
     await flush();
 
     const s = useStore.getState();
     expect(s.compare).toBe(true);
-    expect(s.entries).toEqual([
-      { kind: "model", modelId: "arpege_europe" },
-      { kind: "place", lat: 45.8992, lon: 6.1294, name: "Annecy" },
-    ]);
+    expect(s.compareMode).toBe("model");
+    expect(s.entries).toEqual([{ kind: "model", modelId: "arpege_europe" }]);
+    // no place card on the model board: the place is the page context
+    expect(s.entries.every((e) => e.kind === "model")).toBe(true);
     expect(fetchAromeMock).toHaveBeenCalledWith(
       45.8992,
       6.1294,
       "arpege_europe",
+      expect.anything(),
+    );
+  });
+
+  test("is ignored on the place board", () => {
+    useStore.setState({
+      compare: true,
+      compareMode: "place",
+      entries: [{ kind: "place", lat: 46, lon: 7 }],
+    });
+    useStore.getState().addModelToBoard("arpege_europe");
+    expect(useStore.getState().entries).toEqual([
+      { kind: "place", lat: 46, lon: 7 },
+    ]);
+  });
+
+  test("toggleCompare(true, 'model') seeds the board with the selected model", async () => {
+    useStore.setState({ compare: false, entries: [], modelId: "icon_d2" });
+    useStore.getState().toggleCompare(true, "model");
+    await flush();
+
+    const s = useStore.getState();
+    expect(s.compareMode).toBe("model");
+    expect(s.entries).toEqual([{ kind: "model", modelId: "icon_d2" }]);
+    expect(fetchAromeMock).toHaveBeenCalledWith(
+      45.8992,
+      6.1294,
+      "icon_d2",
       expect.anything(),
     );
   });
@@ -177,7 +209,7 @@ describe("compare.removeEntry", () => {
     expect(s.entryStates).toEqual({ [entryKey(a)]: { status: "ready", data: payload() } });
   });
 
-  test("removing the last entry closes compare mode", () => {
+  test("removing the last entry keeps the page open on its placeholder", () => {
     useStore.setState({
       compare: true,
       entries: [{ kind: "place", lat: 46, lon: 7 }],
@@ -185,9 +217,29 @@ describe("compare.removeEntry", () => {
     useStore.getState().removeEntry("place:46.0000,7.0000");
 
     const s = useStore.getState();
-    expect(s.compare).toBe(false);
+    // an empty board is a valid state: the compare page stays open
+    expect(s.compare).toBe(true);
     expect(s.entries).toEqual([]);
     expect(s.entryStates).toEqual({});
+  });
+
+  test("dismantling a real comparison below two entries records it", () => {
+    useStore.setState({
+      compare: true,
+      entries: [
+        { kind: "place", lat: 45.8992, lon: 6.1294 },
+        { kind: "place", lat: 46, lon: 7 },
+        { kind: "place", lat: 45.92, lon: 6.87 },
+      ],
+      entryStates: {},
+    });
+    // 3 → 2: still a comparison, nothing recorded
+    useStore.getState().removeEntry("place:45.9200,6.8700");
+    expect(useStore.getState().history).toEqual([]);
+    // 2 → 1: the board stops being a comparison and lands in the recents
+    useStore.getState().removeEntry("place:46.0000,7.0000");
+    expect(useStore.getState().history).toHaveLength(1);
+    expect(useStore.getState().history[0]?.label).toBe("45.8992,6.1294 +1");
   });
 });
 
@@ -231,7 +283,7 @@ describe("compare.moveEntry", () => {
 });
 
 describe("compare.clearBoard", () => {
-  test("clears everything and closes the compare page", async () => {
+  test("clears the board and keeps the page open on its placeholder", async () => {
     useStore.setState({
       compare: true,
       entries: [
@@ -243,24 +295,76 @@ describe("compare.clearBoard", () => {
     useStore.getState().clearBoard();
 
     const s = useStore.getState();
-    expect(s.compare).toBe(false);
+    // the page stays open with zero entries; only leaving it closes compare
+    expect(s.compare).toBe(true);
     expect(s.entries).toEqual([]);
     // the board was a real comparison: it lands in the history
     expect(s.history).toHaveLength(1);
     expect(s.history[0]?.label).toBe("45.8992,6.1294 +1");
   });
 
-  test("a single-place board is discarded without polluting the history", () => {
+  test("a single-place board is cleared without polluting the history", () => {
     useStore.setState({ compare: true, entries: [{ kind: "place", lat: 46, lon: 7 }] });
     useStore.getState().clearBoard();
 
-    expect(useStore.getState().compare).toBe(false);
+    expect(useStore.getState().compare).toBe(true);
+    expect(useStore.getState().entries).toEqual([]);
     expect(useStore.getState().history).toEqual([]);
+  });
+
+  test("a model board is recorded with its place and mode", () => {
+    useStore.setState({
+      compare: true,
+      compareMode: "model",
+      entries: [
+        { kind: "model", modelId: "icon_d2" },
+        { kind: "model", modelId: "arpege_europe" },
+      ],
+    });
+    useStore.getState().clearBoard();
+
+    const s = useStore.getState();
+    expect(s.history).toHaveLength(1);
+    const saved = s.history[0]!;
+    expect(saved.mode).toBe("model");
+    expect(saved.point).toEqual({ lat: 45.8992, lon: 6.1294 });
+    expect(saved.label).toBe("Annecy · ICON D2 +1");
+  });
+
+  test("restoring a model board switches the place too", async () => {
+    useStore.setState({
+      compare: false,
+      entries: [],
+      history: [
+        {
+          id: "m1",
+          at: 1000,
+          label: "Chamonix · ICON D2 +1",
+          mode: "model",
+          point: { lat: 45.9231, lon: 6.8692 },
+          entries: [
+            { kind: "model", modelId: "icon_d2" },
+            { kind: "model", modelId: "arpege_europe" },
+          ],
+        },
+      ],
+    });
+    useStore.getState().restoreFromHistory("m1");
+    await flush();
+
+    const s = useStore.getState();
+    expect(s.compare).toBe(true);
+    expect(s.compareMode).toBe("model");
+    expect(s.point).toEqual({ lat: 45.9231, lon: 6.8692 });
+    expect(s.entries).toEqual([
+      { kind: "model", modelId: "icon_d2" },
+      { kind: "model", modelId: "arpege_europe" },
+    ]);
   });
 });
 
 describe("compare.loadEntries", () => {
-  test("marks every entry loading, then ready", async () => {
+  test("marks entries loading, then ready", async () => {
     useStore.setState({
       compare: true,
       entries: [
@@ -274,7 +378,7 @@ describe("compare.loadEntries", () => {
     );
     useStore.getState().loadEntries();
 
-    // loading is set synchronously for every entry
+    // loading is set synchronously for entries with nothing on screen
     const states = useStore.getState().entryStates;
     expect(states["place:46.0000,7.0000"]?.status).toBe("loading");
     expect(states["model:arpege_europe"]?.status).toBe("loading");
@@ -282,6 +386,29 @@ describe("compare.loadEntries", () => {
     for (const resolve of resolvers) resolve(payload());
     await flush();
     expect(useStore.getState().entryStates["place:46.0000,7.0000"]?.status).toBe("ready");
+  });
+
+  test("keeps displayed data on screen while reloading (no layout shift)", async () => {
+    const ready: EntryState = { status: "ready", data: payload() };
+    useStore.setState({
+      compare: true,
+      compareMode: "model",
+      entries: [
+        { kind: "model", modelId: "arome_france" },
+        { kind: "model", modelId: "icon_d2" },
+      ],
+      entryStates: { "model:arome_france": ready },
+    });
+    fetchAromeMock.mockImplementation(
+      () => new Promise<AromeResponse>(() => {}),
+    );
+    useStore.getState().setModelBoardPlace({ lat: 45.8992, lon: 6.1294 });
+
+    // the card with data stays ready; only the unknown one is loading
+    const states = useStore.getState().entryStates;
+    expect(states["model:arome_france"]?.status).toBe("ready");
+    expect(states["model:icon_d2"]?.status).toBe("loading");
+    expect(useStore.getState().point).toEqual({ lat: 45.8992, lon: 6.1294 });
   });
 
   test("a failing entry stores an inline error, not a global banner", async () => {
@@ -311,6 +438,22 @@ describe("compare.loadEntries", () => {
       46,
       7,
       "arome_france",
+      expect.objectContaining({ force: true }),
+    );
+  });
+
+  test("model entries fetch the current place with their own model", async () => {
+    useStore.setState({
+      compare: true,
+      compareMode: "model",
+      entries: [{ kind: "model", modelId: "icon_d2" }],
+    });
+    useStore.getState().loadEntries({ force: true });
+    await flush();
+    expect(fetchAromeMock).toHaveBeenCalledWith(
+      45.8992,
+      6.1294,
+      "icon_d2",
       expect.objectContaining({ force: true }),
     );
   });

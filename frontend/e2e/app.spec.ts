@@ -27,9 +27,12 @@ test("the language switcher translates the UI and persists", async ({ page }) =>
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
   await expect(page.locator(".site-form button", { hasText: "Refresh" })).toBeVisible();
+  await expect(page.locator(".place-line .fav-add")).toHaveAttribute(
+    "aria-label",
+    "Add the current place to your favorites",
+  );
   await page.locator('select[aria-label="Language"]').selectOption("fr");
   await expect(page.locator(".site-form button", { hasText: "Rafraîchir" })).toBeVisible();
-  await expect(page.locator(".place-line .fav-add")).toHaveText("+ Favori");
   await page.reload();
   await expect(page.locator(".site-form button", { hasText: "Rafraîchir" })).toBeVisible();
 });
@@ -50,7 +53,7 @@ test("the getting-started guide explains models, coverage and quota", async ({ p
   await page.goto("/?lat=45.945&lon=6.71");
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
 
-  await page.locator('button:has-text("Getting started")').click();
+  await page.getByRole("button", { name: "Guide", exact: true }).click();
   await expect(page.locator(".guide")).toBeVisible();
   await expect(page.locator(".guide h2")).toHaveText("Getting started");
   await expect(page.locator(".guide")).toContainText("Which model should I use?");
@@ -84,7 +87,8 @@ test("the getting-started guide explains models, coverage and quota", async ({ p
   await expect(page.locator(".wg")).toHaveCount(0);
   await expect(page).toHaveURL(/guide=1/);
 
-  await page.locator('button:has-text("Back to the app")').click();
+  // the nav closes it too (the guide has no back button of its own)
+  await page.getByRole("button", { name: "Place", exact: true }).click();
   await expect(page.locator(".guide")).toHaveCount(0);
   await expect(page.locator(".wg").first()).toBeVisible();
   await expect(page).not.toHaveURL(/guide=1/);
@@ -204,10 +208,10 @@ test("clicking the logo returns to the clean home page", async ({ page }) => {
   await page.locator(".brand-home").click();
   await expect(page).not.toHaveURL(/[?&]/);
   await expect(page.locator(".meta")).toContainText("45.945°N 6.710°E");
-  await expect(page.locator(".board")).toHaveCount(0);
+  await expect(page.locator(".board-list")).toHaveCount(0);
 
   // the logo also closes the guide
-  await page.locator('button:has-text("Getting started")').click();
+  await page.getByRole("button", { name: "Guide", exact: true }).click();
   await expect(page.locator(".guide")).toBeVisible();
   await page.locator(".brand-home").click();
   await expect(page.locator(".guide")).toHaveCount(0);
@@ -248,7 +252,7 @@ test("model without coverage for the point says so without calling the API", asy
   const om = await mockOpenMeteo(page);
   await page.goto("/?lat=43.29&lon=-0.37&model=meteoswiss_icon_ch1");
   const banner = page.locator(".banner.error");
-  await expect(banner).toContainText("MeteoSwiss ICON CH1 1 km has no data for this location");
+  await expect(banner).toContainText("ICON CH1 1 km has no data for this location");
   await expect(banner).toContainText("Pick another model");
   expect(om.calls()).toBe(0);
 });
@@ -480,19 +484,19 @@ test("favorites: start empty, add, pick, remove and persistence", async ({ page 
   await expect(page.locator(".fav-empty-hint")).toContainText("+ Favorite");
   await page.mouse.click(20, 500);
 
-  // load Chamonix and save it as a favorite
+  // load Chamonix and save it as a favorite: the star toggles on
   await page.locator("#place").fill("chamo");
   await page.locator(".place-menu button:has-text('Chamonix-Mont-Blanc')").click();
   await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
   await favAdd.click();
-  await expect(favAdd).toBeHidden();
+  await expect(favAdd).toHaveClass(/is-on/);
   await expect(favBtn).toHaveText("Favorites (1)");
 
   // picking the favorite loads its point and shows it as saved
   await favBtn.click();
   await page.locator(".fav-item:has-text('Chamonix-Mont-Blanc')").click();
   await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
-  await expect(favAdd).toBeHidden();
+  await expect(favAdd).toHaveClass(/is-on/);
 
   // a second favorite
   await page.locator("#place").fill("annecy");
@@ -500,10 +504,20 @@ test("favorites: start empty, add, pick, remove and persistence", async ({ page 
   await favAdd.click();
   await expect(favBtn).toHaveText("Favorites (2)");
 
+  // the star is a toggle: clicking it again removes the favorite
+  await favAdd.click();
+  await expect(favAdd).not.toHaveClass(/is-on/);
+  await expect(favBtn).toHaveText("Favorites (1)");
+  await favAdd.click();
+  await expect(favAdd).toHaveClass(/is-on/);
+  await expect(favBtn).toHaveText("Favorites (2)");
+
   // remove the Annecy favorite
   await favBtn.click();
   await page.locator('.fav-list li:has-text("Annecy") .fav-remove').click();
   await expect(favBtn).toHaveText("Favorites (1)");
+  // the star follows: the current place is no longer saved
+  await expect(favAdd).not.toHaveClass(/is-on/);
   await page.mouse.click(20, 500);
 
   // favorites persist across a reload
@@ -557,18 +571,20 @@ test("opening the Compare page pins the current place", async ({ page }) => {
   await page.getByRole("button", { name: "Compare places" }).click();
   await expect(page).toHaveURL(/compare=1&pins=45\.9450,6\.7100/);
   // the current place joins the board automatically, main windgram disappears,
-  // the main search is replaced by the back button
+  // the main search is replaced by the page nav
   await expect(page.locator(".board-card")).toHaveCount(1);
   await expect(page.locator(".board-card-name")).toHaveText("45.9450, 6.7100");
   await expect(page.locator(".board-head h2")).toHaveText("Compare · 1 place");
   await expect(page.locator(".wg")).toHaveCount(1);
   await expect(page.locator("#place")).toHaveCount(0);
-  await expect(page.locator(".compare-top")).toBeVisible();
+  await expect(
+    page.locator('.page-nav button[aria-current="page"]'),
+  ).toHaveText("Compare places");
   expect(om.calls()).toBe(1); // auto-pin reuses the main cache
 
   // the browser back button leaves the compare page
   await page.goBack();
-  await expect(page.locator(".board")).toHaveCount(0);
+  await expect(page.locator(".board-list")).toHaveCount(0);
   await expect(page.locator(".wg")).toHaveCount(1);
   await expect(page).not.toHaveURL(/compare=1/);
   await expect(page.locator("#place")).toBeVisible();
@@ -578,9 +594,9 @@ test("opening the Compare page pins the current place", async ({ page }) => {
   await expect(page.locator(".board-card")).toHaveCount(1);
   await expect(page.locator(".board-card-name")).toHaveText("45.9450, 6.7100");
 
-  // the back button of the compare page also leaves it
-  await page.getByRole("button", { name: "Back to the place" }).click();
-  await expect(page.locator(".board")).toHaveCount(0);
+  // the "Place" tab of the nav also leaves it
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
   await expect(page.locator(".wg")).toHaveCount(1);
   await expect(page).not.toHaveURL(/pins=/);
 
@@ -634,18 +650,18 @@ test("adding places to the board: search +, board picker and favorites", async (
 
   // favorites already in the comparison are disabled in the board menu;
   // the picker only adds pins, it never deletes favorites
-  const boardFav = page.locator(".board-tools .fav-menu > button");
+  const boardFav = page.locator(".page-header-actions .fav-menu > button");
   await boardFav.click();
   await expect(
-    page.locator('.board-tools .fav-item:has-text("Aravis")'),
+    page.locator('.page-header-actions .fav-item:has-text("Aravis")'),
   ).toBeDisabled();
   await expect(
-    page.locator('.board-tools .fav-item:has-text("Puy de Dôme")'),
+    page.locator('.page-header-actions .fav-item:has-text("Puy de Dôme")'),
   ).toBeEnabled();
-  await expect(page.locator(".board-tools .fav-remove")).toHaveCount(0);
+  await expect(page.locator(".page-header-actions .fav-remove")).toHaveCount(0);
 });
 
-test("removing pins just removes them; the last removal closes compare", async ({ page }) => {
+test("removing pins just removes them; an empty board shows the placeholder", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux;46.1,6.2");
   await expect(page.locator(".board-card")).toHaveCount(3);
@@ -656,37 +672,47 @@ test("removing pins just removes them; the last removal closes compare", async (
   await expect(page.locator(".board-card")).toHaveCount(2);
   await expect(page).not.toHaveURL(/Plaine%20Joux/);
   // removing the current place's pin no longer ends the comparison
-  await expect(page.locator(".board")).toBeVisible();
+  await expect(page.locator(".board-list")).toBeVisible();
   await expect(page).toHaveURL(/compare=1/);
 
   await page
     .locator('button[aria-label="Remove 45.9450, 6.7100 from the comparison"]')
     .click();
   await expect(page.locator(".board-card")).toHaveCount(1);
-  await expect(page.locator(".board")).toBeVisible();
+  await expect(page.locator(".board-list")).toBeVisible();
 
   await page
     .locator('button[aria-label="Remove 46.1000, 6.2000 from the comparison"]')
     .click();
-  await expect(page.locator(".board")).toHaveCount(0);
-  await expect(page.locator(".wg")).toHaveCount(1);
-  await expect(page).not.toHaveURL(/compare=1/);
+  // zero entries is a valid state: the page stays open with its placeholder
+  await expect(page.locator(".board-card")).toHaveCount(0);
+  await expect(page.locator(".board-title")).toHaveText(
+    "Select places to compare…",
+  );
+  await expect(page).toHaveURL(/compare=1/);
   await expect(page).not.toHaveURL(/pins=/);
+
+  // picking from the empty board works right away
+  await page.locator("#board-place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').first().click();
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await expect(page.locator(".board-title")).toHaveText("Compare · 1 place");
 });
 
-test("clear all empties the board, closes the page and records it", async ({ page }) => {
+test("clear all empties the board, keeps the page open and records it", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux;46.1,6.2");
   await expect(page.locator(".board-card")).toHaveCount(3);
   await page.locator('button:has-text("Clear all")').click();
-  await expect(page.locator(".board")).toHaveCount(0);
-  await expect(page.locator(".wg")).toHaveCount(1);
-  await expect(page).not.toHaveURL(/compare=1/);
+  await expect(page.locator(".board-card")).toHaveCount(0);
+  // the page stays open on its placeholder, the URL keeps compare=1
+  await expect(page.locator(".board-title")).toHaveText(
+    "Select places to compare…",
+  );
+  await expect(page).toHaveURL(/compare=1/);
   await expect(page).not.toHaveURL(/pins=/);
 
   // the cleared board landed in the recent list and can be brought back
-  await page.getByRole("button", { name: "Compare places" }).click();
-  await expect(page.locator(".board-card")).toHaveCount(1);
   await page.locator(".hist-menu > button").click();
   await expect(page.locator(".hist-menu .fav-item").first()).toContainText("Plaine Joux +2");
   await page.locator(".hist-menu .fav-item").first().click();
@@ -696,6 +722,195 @@ test("clear all empties the board, closes the page and records it", async ({ pag
     "46.1000, 6.2000",
     "45.9450, 6.7100",
   ]);
+});
+
+test("compare models at one place: pick, reorder, share and recents", async ({ page }) => {
+  const om = await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  // the nav has two compare tabs; the model one seeds the board with the
+  // currently selected model (AROME 2.5 km), the place stays page context
+  await page.getByRole("button", { name: "Compare models" }).click();
+  await expect(page).toHaveURL(/compare=models&pins=model:arome_france$/);
+  await expect(
+    page.locator('.page-nav button[aria-current="page"]'),
+  ).toHaveText("Compare models");
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await expect(page.locator(".board-card-name")).toHaveText("AROME 2.5 km");
+  await expect(page.locator(".board-head h2")).toHaveText(
+    "45.9450, 6.7100 · 1 model",
+  );
+  // no favorites on the model board; the place picker switches the location
+  await expect(page.locator(".page-header-actions .fav-menu")).toHaveCount(0);
+  await expect(page.locator("#board-switch")).toHaveCount(1);
+
+  // the Models menu lists the catalog; toggling adds a card per model
+  const modelsBtn = page.locator(".page-header-context .model-menu > button");
+  await modelsBtn.click();
+  await page.locator('.model-menu .fav-item:has-text("ICON D2")').click();
+  await page.locator('.model-menu .fav-item:has-text("ICON CH1")').click();
+  // the seeded model counts too: 1 + 2 toggles
+  await expect(modelsBtn).toHaveText("Models (3)");
+  // the menu stays open so several models can be toggled in one go
+  await expect(page.locator(".model-menu .fav-list")).toBeVisible();
+  await page.locator(".board-head h2").click();
+  await expect(page.locator(".board-card")).toHaveCount(3);
+  await expect(page.locator(".board-card-name")).toHaveText([
+    "AROME 2.5 km",
+    "ICON D2",
+    "ICON CH1",
+  ]);
+  await expect(page.locator(".board-head h2")).toHaveText(
+    "45.9450, 6.7100 · 3 models",
+  );
+  // every card got its own data (3 fetches, one per model)
+  await expect(page.locator(".board-card .wg")).toHaveCount(3);
+  expect(om.calls()).toBe(3);
+  // each card carries its model info and the run it was built from
+  await expect(page.locator(".board-card-foot").first()).toContainText(
+    /run .* UTC/,
+  );
+
+  // the average toggle prepends a derived card (no extra fetch), first in
+  // the board, with the mean of the three loaded models
+  await page.locator('button:has-text("Average")').click();
+  await expect(page.locator(".board-card")).toHaveCount(4);
+  await expect(page.locator(".board-card").first()).toContainText("Average (3)");
+  await expect(page.locator(".board-card").first()).toHaveClass(/is-average/);
+  await expect(page.locator(".board-card .wg")).toHaveCount(4);
+  expect(om.calls()).toBe(3);
+  // the toggle survives a reload (persisted with the board)
+  await page.reload();
+  await expect(page.locator(".board-card").first()).toContainText("Average (3)");
+  // toggling it off restores the raw board
+  await page.locator('button:has-text("Average")').click();
+  await expect(page.locator(".board-card")).toHaveCount(3);
+  await expect(page.locator(".board-card").first()).toContainText("AROME 2.5 km");
+  await expect(page).toHaveURL(
+    /pins=model:arome_france;model:icon_d2;model:meteoswiss_icon_ch1$/,
+  );
+
+  // reorder: move ICON D2 up, the URL follows the new order
+  await page
+    .locator(".board-card", { hasText: "ICON D2" })
+    .locator('button[aria-label="Move ICON D2 up"]')
+    .click();
+  await expect(page.locator(".board-card-name")).toHaveText([
+    "ICON D2",
+    "AROME 2.5 km",
+    "ICON CH1",
+  ]);
+  await expect(page).toHaveURL(
+    /pins=model:icon_d2;model:arome_france;model:meteoswiss_icon_ch1$/,
+  );
+
+  // the shared URL restores the model board in the same order
+  await page.reload();
+  await expect(page.locator(".board-card-name")).toHaveText([
+    "ICON D2",
+    "AROME 2.5 km",
+    "ICON CH1",
+  ]);
+
+  // removing the last model card keeps the page open on its placeholder
+  await page
+    .locator(".board-card", { hasText: "ICON CH1" })
+    .locator(".board-card-remove")
+    .click();
+  await expect(page.locator(".board-card")).toHaveCount(2);
+  await page
+    .locator(".board-card", { hasText: "ICON D2" })
+    .locator(".board-card-remove")
+    .click();
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await page
+    .locator(".board-card", { hasText: "AROME 2.5 km" })
+    .locator(".board-card-remove")
+    .click();
+  await expect(page.locator(".board-card")).toHaveCount(0);
+  await expect(page.locator(".board-title")).toHaveText(
+    "Select models to compare…",
+  );
+  await expect(page).toHaveURL(/compare=models/);
+  await expect(page).not.toHaveURL(/pins=/);
+
+  // leaving via the nav still closes it; the dismantled board landed in
+  // the recents and can be restored
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
+  await expect(page.locator(".wg")).toHaveCount(1);
+  await expect(page).not.toHaveURL(/compare=models/);
+
+  await page.getByRole("button", { name: "Compare models" }).click();
+  // reopening seeds the selected model again (a fresh board)
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await page.locator(".hist-menu > button").click();
+  await expect(page.locator(".hist-menu .fav-item").first()).toContainText(
+    "45.9450,6.7100 · ICON D2 +1",
+  );
+  await page.locator(".hist-menu .fav-item").first().click();
+  await expect(page.locator(".board-card")).toHaveCount(2);
+});
+
+test("the two compare pages keep separate recent lists", async ({ page }) => {
+  await mockOpenMeteo(page);
+  // a place comparison is recorded…
+  await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux");
+  await expect(page.locator(".board-card")).toHaveCount(2);
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
+
+  // …then a model comparison
+  await page.getByRole("button", { name: "Compare models" }).click();
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await page.locator(".page-header-context .model-menu > button").click();
+  await page.locator('.model-menu .fav-item:has-text("ICON D2")').click();
+  await page.locator(".board-head h2").click();
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
+
+  // the place page lists only place comparisons
+  await page.getByRole("button", { name: "Compare places" }).click();
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await page.locator(".hist-menu > button").click();
+  await expect(page.locator(".hist-menu .fav-item")).toHaveCount(1);
+  await expect(page.locator(".hist-menu .fav-item").first()).toContainText(
+    "Plaine Joux +1",
+  );
+
+  // the model page lists only model comparisons
+  await page.getByRole("button", { name: "Compare models" }).click();
+  await page.locator(".hist-menu > button").click();
+  await expect(page.locator(".hist-menu .fav-item")).toHaveCount(1);
+  await expect(page.locator(".hist-menu .fav-item").first()).toContainText(
+    "45.9450,6.7100 · AROME 2.5 km +1",
+  );
+});
+
+test("the model board can switch place and keeps its models", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhoton(page);
+  await page.goto("/?lat=45.945&lon=6.71&compare=models&pins=model:arome_france;model:icon_d2");
+  await expect(page.locator(".board-card")).toHaveCount(2);
+  await expect(page.locator(".board-card-foot").first()).toContainText(
+    "45.9450,6.7100",
+  );
+
+  // switching place refetches the SAME models at the new coordinates
+  await page.locator("#board-switch").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+  await expect(page.locator(".board-card")).toHaveCount(2);
+  await expect(page.locator(".board-card-foot").first()).toContainText(
+    "45.8992,6.1294",
+  );
+  // the URL follows the new place, the model list is untouched
+  await expect(page).toHaveURL(/lat=45\.8992&lon=6\.1294.*compare=models/);
+  await expect(page).toHaveURL(/pins=model:arome_france;model:icon_d2/);
+  // the main context moved too: leaving shows the new place
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".wg")).toHaveCount(1);
+  await expect(page).toHaveURL(/lat=45\.8992&lon=6\.1294/);
 });
 
 test("the board can be reordered with the up and down arrows", async ({ page }) => {
@@ -769,7 +984,7 @@ test("a pin outside the model domain shows an inline error, not a banner", async
   );
   await expect(page.locator(".board-card-name").first()).toBeVisible();
   const note = page.locator(".board-card-note.error");
-  await expect(note).toContainText("MeteoSwiss ICON CH1 1 km has no data for this location");
+  await expect(note).toContainText("ICON CH1 1 km has no data for this location");
   await expect(page.locator(".banner.error")).toHaveCount(0);
   expect(om.calls()).toBe(1); // main only: the pin is rejected before any call
 });
@@ -788,7 +1003,7 @@ test("pinned names survive a reload", async ({ page }) => {
 
   // with compare off the board is discarded: no Photon mock here, so the
   // header falls back to the bare coordinates
-  await page.getByRole("button", { name: "Back to the place" }).click();
+  await page.getByRole("button", { name: "Place", exact: true }).click();
   await expect(page.locator(".place-line strong")).toContainText("45.9231°N 6.8692°E");
 });
 
@@ -808,8 +1023,8 @@ test("leaving the Compare page discards the board and records it", async ({ page
   await expect(page.locator(".board-card")).toHaveCount(2);
   await expect(page.locator(".wg")).toHaveCount(2);
 
-  await page.getByRole("button", { name: "Back to the place" }).click();
-  await expect(page.locator(".board")).toHaveCount(0);
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
   await expect(page).not.toHaveURL(/compare=1/);
   await expect(page).not.toHaveURL(/pins=/);
   await expect(page.locator(".wg")).toHaveCount(1);
@@ -825,8 +1040,8 @@ test("a closed comparison is restored from the recent list", async ({ page }) =>
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux");
   await expect(page.locator(".board-card")).toHaveCount(2);
 
-  await page.getByRole("button", { name: "Back to the place" }).click();
-  await expect(page.locator(".board")).toHaveCount(0);
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Compare places" }).click();
   await expect(page.locator(".board-card")).toHaveCount(1);
@@ -844,26 +1059,36 @@ test("a closed comparison is restored from the recent list", async ({ page }) =>
   await expect(page).toHaveURL(/pins=45\.9200,6\.8700\/Plaine%20Joux/);
 });
 
-test("a recent comparison is reachable from the home page", async ({ page }) => {
+test("a recent comparison lives on the compare page, not the home page", async ({ page }) => {
   await mockOpenMeteo(page);
+  await mockPhoton(page);
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux");
   await expect(page.locator(".board-card")).toHaveCount(2);
 
-  await page.getByRole("button", { name: "Back to the place" }).click();
-  await expect(page.locator(".board")).toHaveCount(0);
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
   await expect(page.locator(".wg")).toHaveCount(1);
 
+  // the home page has no comparison recents: they live on the compare page.
+  // Its own recent list holds places: searching feeds it
+  await expect(page.locator(".hist-menu")).toHaveCount(0);
+  await page.locator("#place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+  await expect(page.locator(".wg")).toHaveCount(1);
+  await page.locator(".recent-menu > button").click();
+  await expect(page.locator(".recent-menu .fav-item").first()).toContainText("Annecy");
+
+  // re-entering the compare page exposes the recorded comparison
+  await page.getByRole("button", { name: "Compare places" }).click();
+  await expect(page.locator(".board-card")).toHaveCount(1);
   // the recent list survives a reload (persisted, rehydrated at boot)
   await page.reload();
-  await expect(page.locator(".wg")).toHaveCount(1);
-  await page.locator(".site-form-actions .hist-menu > button").click();
-  await expect(
-    page.locator(".site-form-actions .hist-menu .fav-item").first(),
-  ).toContainText("Plaine Joux +1");
+  await expect(page.locator(".board-card")).toHaveCount(1);
+  await page.locator(".hist-menu > button").click();
+  await expect(page.locator(".hist-menu .fav-item").first()).toContainText("Plaine Joux +1");
+  await page.locator(".hist-menu .fav-item").first().click();
 
-  await page.locator(".site-form-actions .hist-menu .fav-item").first().click();
-
-  // restoring opens the compare page directly
+  // restoring brings the board back with both entries
   await expect(page.locator(".board-card")).toHaveCount(2);
   await expect(page.locator(".board-card-name")).toHaveText([
     "Plaine Joux",
@@ -876,12 +1101,12 @@ test("the last removal of the recent list empties it", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71&compare=1&pins=45.92,6.87/Plaine%20Joux");
   await expect(page.locator(".board-card")).toHaveCount(2);
-  await page.getByRole("button", { name: "Back to the place" }).click();
-  await expect(page.locator(".board")).toHaveCount(0);
+  await page.getByRole("button", { name: "Place", exact: true }).click();
+  await expect(page.locator(".board-list")).toHaveCount(0);
   await page.getByRole("button", { name: "Compare places" }).click();
   // re-entering and discarding a 1-place board records nothing new but keeps
   // the previous entry
-  await page.getByRole("button", { name: "Back to the place" }).click();
+  await page.getByRole("button", { name: "Place", exact: true }).click();
   await page.getByRole("button", { name: "Compare places" }).click();
   await expect(page.locator(".hist-menu > button")).toBeVisible();
 });

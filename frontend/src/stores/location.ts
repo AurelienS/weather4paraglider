@@ -52,6 +52,12 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
       set({ point: { lat, lon } });
       get().ensurePlace();
     }
+    // every explicit place selection feeds the main page recent list
+    get().addRecentPlace({
+      lat,
+      lon,
+      label: label ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+    });
     get().loadMain();
   },
 

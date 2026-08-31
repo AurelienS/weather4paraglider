@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { groupByDay } from "../lib/format";
+import { groupByDay, dayLabel, utcSlot } from "../lib/format";
 import { interpolate } from "../lib/i18n";
 import { useI18n } from "../i18nContext";
 import { pinKey, type Pin } from "../lib/pins";
@@ -114,7 +114,11 @@ export function PinCard({
       {data ? (
         <p className="board-card-foot">
           {pinKey(pin)} · {data.model} {data.grid} ·{" "}
-          {interpolate(t.pinAlt, { m: data.modelElevationM })}
+          {interpolate(t.pinRun, {
+            day: dayLabel(data.runInitUtc, lang),
+            slot: utcSlot(data.runInitUtc),
+          })}{" "}
+          · {interpolate(t.pinAlt, { m: data.modelElevationM })}
         </p>
       ) : null}
     </section>

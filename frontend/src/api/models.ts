@@ -207,6 +207,19 @@ export const MODELS: readonly ModelDef[] = [
 
 export const DEFAULT_MODEL: ModelId = "arome_france";
 
+/** Dropdown grouping of the model select, in display order: the all-altitude
+ * reference models first, then the ground-precision specialists, the nowcast
+ * and finally the longer-range models. Shared by the main select and the
+ * compare-models menu. */
+export const MODEL_GROUP_ORDER = [
+  "allAltitude",
+  "lowLevel",
+  "nowcast",
+  "longRange",
+] as const;
+
+export type ModelGroup = (typeof MODEL_GROUP_ORDER)[number];
+
 export function isModelId(value: unknown): value is ModelId {
   return MODELS.some((m) => m.id === value);
 }

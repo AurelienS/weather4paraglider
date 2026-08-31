@@ -139,23 +139,73 @@ select optgroup {
   border-bottom: 1px solid var(--line);
 }
 
+/* Nav and the language / theme actions share the first header row. */
+/* First header row: logo left, pages centered, language/theme right. */
+.top-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.top-bar .brand-home {
+  justify-self: start;
+}
+
 .top-actions {
+  justify-self: end;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 8px;
 }
 
+/* Shared right-hand header skeleton: the place form and the compare
+ * boards render into the same two-row zone, so every page aligns the
+ * same way and content changes reflow text inside a row, never the
+ * layout. The zone fills the width left after the tagline; rows are
+ * left-aligned and their boxes are fixed. */
 .top-main {
   display: flex;
-  justify-content: space-between;
-  gap: 28px;
   align-items: flex-end;
+  gap: 28px;
   flex-wrap: wrap;
 }
 
-.brand {
-  align-self: flex-start;
+.top-main > .site-form,
+.top-main > .page-header {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.page-header-context {
+  display: flex;
+  /* the title text sits on the input's center line, not below it */
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.site-form {
+  position: relative;
 }
 
 .theme-btn {
@@ -200,32 +250,6 @@ select optgroup {
 .lang-select:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
-}
-
-.guide-btn {
-  appearance: none;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--focus);
-  font: 600 0.88rem var(--sans);
-  cursor: pointer;
-  flex: none;
-}
-
-.guide-btn::after {
-  content: " →";
-}
-
-.guide-btn:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
-
-.guide-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 .guide {
@@ -467,40 +491,38 @@ select optgroup {
   fill: var(--focus);
 }
 
-.brand-sub {
+/* Top page navigation: slim tab row marking the active page. */
+.page-nav {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  gap: 2px;
+  overflow-x: auto;
 }
 
-.brand-sub p {
-  margin: 0;
+.page-nav button {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
   color: var(--muted);
-  font-size: 0.95rem;
+  padding: 4px 10px 3px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.site-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-  position: relative;
+.page-nav button:hover {
+  color: var(--text);
 }
 
-.compare-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.page-nav button[aria-current="page"] {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--focus);
 }
 
 .hist-menu .fav-list {
   min-width: 230px;
-}
-
-.site-form-place-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
 }
 
 .site-form label {
@@ -515,7 +537,22 @@ select optgroup {
 
 .place-search {
   position: relative;
-  flex: 0 1 320px;
+  flex: 0 1 400px;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.place-search > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* same box as the row's buttons: no 3px mismatch between input and
+     buttons on any page */
+  align-self: stretch;
+}
+
+.place-search .place-map {
+  flex: none;
 }
 
 .place-search input {
@@ -614,7 +651,8 @@ select optgroup {
   font-size: 0.85rem;
 }
 
-.fav-menu {
+.fav-menu,
+.model-menu {
   position: relative;
   display: flex;
   gap: 8px;
@@ -665,6 +703,33 @@ select optgroup {
   color: var(--focus);
 }
 
+/* Group header row (model menu mirrors the main dropdown groups). */
+.fav-group {
+  padding: 8px 8px 3px;
+  margin: 0;
+  font: 600 0.72rem var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fav-list li.is-on .fav-item {
+  color: var(--focus);
+}
+
+.fav-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fav-check {
+  margin-left: auto;
+  color: var(--focus);
+  font-weight: 600;
+}
+
 .fav-item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -712,14 +777,15 @@ select optgroup {
   font-size: 0.78rem;
 }
 
-/* Own line between the place input and the action buttons. Inline-size
-   containment keeps the long single-line label out of the form's intrinsic
-   width so picking a place never changes the header height. */
+/* The place caption lives in the shared header title slot (same spot as
+   the compare boards' titles). The name truncates, the favorite button
+   keeps its size, and the row height never depends on the name length. */
 .place-line {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin: 2px 0 6px;
+  margin: 0;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -727,24 +793,45 @@ select optgroup {
 .place-line strong {
   font: 600 1.05rem var(--sans);
   color: var(--text);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .place-line .fav-add {
-  flex: 0 0 auto;
-  padding: 3px 10px;
-  font-size: 0.78rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.fav-add.is-hidden {
-  visibility: hidden;
+.place-line .fav-add:hover {
+  color: var(--text);
 }
 
-.site-form-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.place-line .fav-add svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+
+/* the star fills when the place is saved: one control, on/off */
+.place-line .fav-add.is-on {
+  color: var(--focus);
+}
+
+.place-line .fav-add.is-on svg {
+  fill: currentColor;
 }
 
 .site-form-secondary {
@@ -765,6 +852,14 @@ select optgroup {
 
 .btn:hover:not(:disabled) {
   border-color: var(--muted);
+}
+
+/* toggle buttons (average card, favorite star): the pressed state must be
+   readable at a glance */
+.btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .btn:disabled {
@@ -993,45 +1088,38 @@ select optgroup {
   user-select: none;
 }
 
-.board {
-  margin: 4px 0 22px;
-}
-
-.board-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 14px;
-  border-top: 1px dashed var(--line);
-  padding-top: 14px;
-  margin-bottom: 12px;
-}
-
-.board-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
 .place-search.is-compact {
-  /* the compact input is 230px wide: keep the wrapper at the same width so
-   * the board tools row has no dead space next to it */
+  /* the compact input stays 230px; the map button rides along, exactly
+     like on the place page */
+  flex: 0 0 auto;
+}
+
+.place-search.is-compact > input {
+  /* same height (padding, font) as the place page's input: only the
+     width changes, so the row's buttons line up on every page */
   flex: 0 0 230px;
-}
-
-.place-search.is-compact input {
   width: 230px;
-  padding: 6px 9px;
-  font-size: 0.85rem;
 }
 
-.board-head h2 {
+.board-title {
   margin: 0;
   font: 600 0.95rem var(--sans);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  /* same white as the place page's caption: one color for the place name
+     everywhere */
+  color: var(--text);
+  /* right-hugging caption over the tools; capped by the row so a long
+     name reflows text inside it (ellipsis), never the layout */
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-title .board-count {
   color: var(--muted);
 }
 
@@ -1041,17 +1129,17 @@ select optgroup {
   font-size: 0.85rem;
 }
 
-.board-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
 .board-card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px 14px;
+}
+
+/* the averaged card is derived, not fetched: dashed frame to tell it
+   apart from real model cards */
+.board-card.is-average {
+  border-style: dashed;
 }
 
 .board-card-head {
@@ -1109,12 +1197,6 @@ select optgroup {
 
 .board-card .wg {
   margin-bottom: 0;
-}
-
-.hint-keys {
-  margin: 10px 0 16px;
-  color: var(--faint);
-  font-size: 0.78rem;
 }
 
 .stats {
@@ -1538,17 +1620,6 @@ select optgroup {
   background: var(--wind);
 }
 
-.notes {
-  margin-top: 18px;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.notes ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-
 .foot {
   margin-top: 28px;
   padding-top: 16px;
@@ -1624,13 +1695,29 @@ select optgroup {
   .app {
     padding: 14px 10px 44px;
   }
-  /* header: actions row, brand on top-left, form below */
+  /* header: logo + actions on one row, pages nav below, form under that */
   .top {
     gap: 10px;
     padding-bottom: 14px;
   }
+  .top-bar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand actions"
+      "nav nav";
+    row-gap: 6px;
+  }
+  .top-bar .brand-home {
+    grid-area: brand;
+  }
   .top-actions {
+    grid-area: actions;
     gap: 6px;
+  }
+  .page-nav {
+    grid-area: nav;
+    justify-self: stretch;
+    overflow-x: auto;
   }
   .top-main {
     flex-direction: column;
@@ -1648,31 +1735,15 @@ select optgroup {
     height: 28px;
     margin-bottom: 2px;
   }
-  .brand-sub {
-    flex-wrap: wrap;
-    gap: 6px 10px;
-  }
-  .brand-sub p {
-    font-size: 0.88rem;
-  }
 
-  /* the form takes the full width, actions wrap under it */
-  .site-form {
-    width: 100%;
-  }
-  .site-form-place-row {
-    width: 100%;
-  }
+  /* the header zone takes the full width, actions wrap under it */
   .place-search {
     flex: 1 1 auto;
   }
   .place-search input {
     width: 100%;
   }
-  .site-form-actions {
-    width: 100%;
-  }
-  .site-form-actions .pick-check {
+  .page-header-actions .pick-check {
     margin-left: auto;
   }
 
@@ -1725,11 +1796,6 @@ select optgroup {
     gap: 6px 10px;
   }
 
-  /* charts keep horizontal scrolling for the wide table */
-  .board-tools {
-    margin-left: 0;
-    width: 100%;
-  }
   .board-card {
     padding: 10px 10px 12px;
   }

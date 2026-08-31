@@ -5,11 +5,20 @@ import {
   entryKey,
   isPlaceEntry,
   moveEntry as moveInList,
+  parseBoard,
   removeEntry as removeFromList,
   type CompareEntry,
 } from "../lib/compare";
-import { recordComparison, parseHistory, HISTORY_KEY, HISTORY_VERSION, type SavedCompare } from "../lib/history";
-import { parsePins, pinKey, type Pin } from "../lib/pins";
+import {
+  recordComparison,
+  parseHistory,
+  migrateHistoryV1,
+  HISTORY_KEY,
+  HISTORY_VERSION,
+  type CompareMode,
+  type SavedCompare,
+} from "../lib/history";
+import { pinKey, type Pin } from "../lib/pins";
 import { dict } from "../lib/i18n";
 import { loadVersioned, storeVersioned } from "../lib/storage";
 import type { EntryState } from "./types";
@@ -21,39 +30,55 @@ function loadHistory(): SavedCompare[] {
   const outcome = loadVersioned<SavedCompare[]>(HISTORY_KEY, {
     current: HISTORY_VERSION,
     parse: parseHistory,
+    migrate: migrateHistoryV1,
   });
   return outcome.data ?? [];
 }
 
 export type CompareSlice = {
   compare: boolean;
+  /** Either places against one model, or one place across models. A board
+   * never mixes both. */
+  compareMode: CompareMode;
   entries: CompareEntry[];
   entryStates: Record<string, EntryState>;
+  /** Model board only: prepend a card averaging every loaded model. */
+  showAverage: boolean;
   /** Recently closed comparisons, newest first, persisted. */
   history: SavedCompare[];
 
-  /** Checkbox/button: opening pins the current place on the board; closing
-   * discards the board (entries and states) and records it in the history. */
-  toggleCompare: (next: boolean) => void;
+  /** Opening pins the current place on the board (places) or seeds it with
+   * the selected model (models); closing discards the board (entries and
+   * states) and records it in the history. */
+  toggleCompare: (next: boolean, mode?: CompareMode) => void;
   /** Explicit "add to compare" from any place source (search, favorites,
-   * map); opens compare mode. */
+   * map); opens the place comparison. Ignored on the model board. */
   addPlaceToBoard: (pin: Pin) => void;
-  /** Same for a model entry (compares the current place across models). */
+  /** Add a model to the model board (compares the current place across
+   * models). Ignored on the place board. */
   addModelToBoard: (modelId: RootState["modelId"]) => void;
+  /** Move the model board to another place: the cards keep their models,
+   * the data is refetched at the new coordinates. */
+  setModelBoardPlace: (pin: Pin) => void;
   /** Remove one entry; the last removal closes compare mode. */
   removeEntry: (key: string) => void;
   /** Reorder the board: move an entry one slot up (-1) or down (+1).
    * Pure order change: loaded entry states keep their keys, no refetch. */
   moveEntry: (key: string, delta: number) => void;
-  /** Reset the board to the current place. */
+  /** Model board only: toggle the averaged "all models" card (always the
+   * first one when on). */
+  toggleAverage: () => void;
+  /** Empty the whole board: closes the compare page. */
   clearBoard: () => void;
   /** Restore a comparison from the history. */
   restoreFromHistory: (id: string) => void;
   /** Popstate: reconcile compare mode with what the URL says. */
-  syncCompareFromUrl: (on: boolean, pinsRaw: string | null) => void;
+  syncCompareFromUrl: (on: boolean, pinsRaw: string | null, mode: CompareMode) => void;
   /** Fetch every entry (place: its coordinates + the selected model;
-   * model: the current place + the entry model). Marks entries as loading,
-   * so stale data from a previous model is never displayed. */
+   * model: the current place + the entry model). Missing entries are
+   * marked loading; already-displayed data stays until replaced, like
+   * the main view during an "Updating…" refresh, so the board does not
+   * collapse while reloading. */
   loadEntries: (opts?: { force?: boolean }) => void;
 };
 
@@ -84,33 +109,68 @@ export const createCompareSlice: StateCreator<
   [],
   CompareSlice
 > = (set, get) => {
+  /** Persist the current board in the recents (only real comparisons with
+   * two entries or more are kept). */
+  function recordBoard() {
+    const { entries, history, compareMode, point, place } = get();
+    const nextHistory = recordComparison(history, entries, Date.now(), {
+      mode: compareMode,
+      point,
+      place,
+    });
+    if (nextHistory !== history) {
+      storeVersioned(HISTORY_KEY, nextHistory, HISTORY_VERSION);
+      set({ history: nextHistory });
+    }
+  }
+
   /** Leaving compare: remember the board (>= 2 entries) then throw it away,
    * so no stale state survives a reopen. */
-  function discardBoard() {    const { entries, history } = get();
-    const nextHistory = recordComparison(history, entries);
-    if (nextHistory !== history) storeVersioned(HISTORY_KEY, nextHistory, HISTORY_VERSION);
+  function discardBoard() {
+    recordBoard();
     batchCtl?.abort();
-    set({ compare: false, entries: [], entryStates: {}, history: nextHistory });
+    set({ compare: false, entries: [], entryStates: {}, showAverage: false });
   }
 
   return {
     compare: false,
+    compareMode: "place",
     entries: [],
     entryStates: {},
+    showAverage: false,
     history: loadHistory(),
 
-    toggleCompare: (next) => {
-      if (next === get().compare) return;
+    toggleCompare: (next, mode = "place") => {
       if (!next) {
-        discardBoard();
+        if (get().compare) discardBoard();
         return;
       }
-      const { point, place, entries } = get();
-      set({ compare: true, entries: withCurrentPlace(entries, point, place) });
+      if (get().compare) {
+        if (get().compareMode === mode) return; // already there
+        // switching flavors: the current board is recorded, then replaced
+        discardBoard();
+      }
+      if (mode === "model") {
+        // the model board starts with the currently selected model; the
+        // place itself is the page context, not a card
+        set({
+          compare: true,
+          compareMode: "model",
+          entries: [{ kind: "model", modelId: get().modelId }],
+        });
+      } else {
+        const { point, place, entries } = get();
+        set({
+          compare: true,
+          compareMode: "place",
+          entries: withCurrentPlace(entries, point, place),
+        });
+      }
       get().loadEntries();
     },
 
     addPlaceToBoard: (pin) => {
+      if (get().compareMode === "model") return;
       const wasOff = !get().compare;
       let entries = addEntry(get().entries, {
         kind: "place",
@@ -123,28 +183,50 @@ export const createCompareSlice: StateCreator<
         const { point, place } = get();
         entries = withCurrentPlace(entries, point, place);
       }
-      set({ compare: true, entries });
+      set({ compare: true, compareMode: "place", entries });
       get().loadEntries();
     },
 
     addModelToBoard: (modelId) => {
+      if (get().compareMode === "place") return;
       const wasOff = !get().compare;
       let entries = addEntry(get().entries, { kind: "model", modelId });
       if (wasOff) {
-        const { point, place } = get();
-        entries = withCurrentPlace(entries, point, place);
+        set({ compare: true, compareMode: "model" });
       }
-      set({ compare: true, entries });
+      set({ entries });
+      get().loadEntries();
+    },
+
+    setModelBoardPlace: (pin) => {
+      if (get().compareMode !== "model" || !get().compare) return;
+      set({ point: { lat: pin.lat, lon: pin.lon }, place: pin.name ?? null });
+      // a place visit like any other: it feeds the main page recents
+      get().addRecentPlace({
+        lat: pin.lat,
+        lon: pin.lon,
+        label: pin.name ?? `${pin.lat.toFixed(4)}, ${pin.lon.toFixed(4)}`,
+      });
+      get().ensurePlace();
+      // keep the main context warm for when the user leaves the board
+      get().loadMain();
       get().loadEntries();
     },
 
     removeEntry: (key) => {
-      const entries = removeFromList(get().entries, key);
-      // an empty board is no longer a comparison
+      const current = get().entries;
+      const entries = removeFromList(current, key);
+      // an empty board is a valid state: the page stays open with its
+      // placeholder, only leaving it (nav) closes compare
       if (entries.length === 0) {
-        discardBoard();
+        // dropping an entry also drops its state, so a re-add starts fresh
+        batchCtl?.abort();
+        set({ entries, entryStates: {} });
         return;
       }
+      // dismantling a real comparison below two entries keeps it in the
+      // recents, like leaving the page would
+      if (current.length >= 2 && entries.length <= 1) recordBoard();
       // dropping an entry also drops its state, so a re-add starts fresh
       const { [key]: _dropped, ...states } = get().entryStates;
       set({ entries, entryStates: states });
@@ -157,33 +239,78 @@ export const createCompareSlice: StateCreator<
       set({ entries });
     },
 
+    toggleAverage: () => {
+      if (get().compareMode !== "model") return;
+      set({ showAverage: !get().showAverage });
+    },
+
     clearBoard: () => {
-      // "Clear all" really clears everything: an empty board closes the
-      // compare page (the board is recorded in the history first when it
+      // "Clear all" empties the board but the page stays open on its
+      // placeholder (the board is recorded in the history first when it
       // had two entries or more)
-      discardBoard();
+      recordBoard();
+      batchCtl?.abort();
+      set({ entries: [], entryStates: {}, showAverage: false });
     },
 
     restoreFromHistory: (id) => {
       const saved = get().history.find((h) => h.id === id);
       if (!saved) return;
-      set({ compare: true, entries: saved.entries.map((e) => ({ ...e })) });
+      if (saved.mode === "model" && saved.point) {
+        // a model board is tied to its place: switching there too
+        set({
+          compare: true,
+          compareMode: "model",
+          point: { ...saved.point },
+          place: null,
+          entries: saved.entries.map((e) => ({ ...e })),
+        });
+        get().ensurePlace();
+        get().loadMain();
+      } else {
+        set({
+          compare: true,
+          compareMode: "place",
+          entries: saved.entries.map((e) => ({ ...e })),
+        });
+      }
       get().loadEntries();
     },
 
-    syncCompareFromUrl: (on, pinsRaw) => {
-      if (on === get().compare) return;
+    syncCompareFromUrl: (on, pinsRaw, mode) => {
       if (!on) {
-        discardBoard();
+        if (get().compare) discardBoard();
         return;
       }
-      const { point, place } = get();
-      let entries: CompareEntry[] =
-        pinsRaw != null
-          ? parsePins(pinsRaw).map((p) => ({ kind: "place" as const, ...p }))
-          : [];
-      entries = withCurrentPlace(entries, point, place);
-      set({ compare: true, entries });
+      // the URL is the source of truth: a bare compare URL boots the empty
+      // board (placeholder); an explicit pins list always carries the
+      // current place, the board compares against it
+      const parsed =
+        mode === "model"
+          ? parseBoard(pinsRaw).filter((e) => e.kind === "model")
+          : parseBoard(pinsRaw).filter(isPlaceEntry);
+      const entries =
+        mode === "place" && pinsRaw != null
+          ? withCurrentPlace(parsed, get().point, get().place)
+          : parsed;
+      // same mode and same order: nothing to reconcile (redundant popstate)
+      const prev = get();
+      const prevKeys = prev.entries.map(entryKey);
+      const nextKeys = entries.map(entryKey);
+      const sameBoard =
+        prev.compare &&
+        prev.compareMode === mode &&
+        prevKeys.length === nextKeys.length &&
+        prevKeys.every((k, i) => k === nextKeys[i]);
+      if (sameBoard) {
+        return;
+      }
+      // drop the states of entries the new URL does not carry
+      const keys = new Set(entries.map(entryKey));
+      const states = Object.fromEntries(
+        Object.entries(prev.entryStates).filter(([k]) => keys.has(k)),
+      );
+      set({ compare: true, compareMode: mode, entries, entryStates: states });
       get().loadEntries();
     },
 
@@ -193,11 +320,16 @@ export const createCompareSlice: StateCreator<
       if (!compare || entries.length === 0) return;
       const ctl = new AbortController();
       batchCtl = ctl;
-      // every batched entry is marked loading first: stale data from a
-      // previous model or a previous session is never shown
-      const loading: Record<string, EntryState> = {};
-      for (const entry of entries) loading[entryKey(entry)] = { status: "loading" };
-      set({ entryStates: loading });
+      // stale-while-revalidate: cards keep what is on screen (previous
+      // model, previous place) until the fresh data lands; only entries
+      // with nothing to show get the loading note
+      const states: Record<string, EntryState> = {};
+      for (const entry of entries) {
+        const key = entryKey(entry);
+        const prev = get().entryStates[key];
+        states[key] = prev ?? { status: "loading" };
+      }
+      set({ entryStates: states });
 
       for (const entry of entries) {
         const key = entryKey(entry);

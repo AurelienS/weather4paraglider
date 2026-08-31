@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { searchPlaces, type Place } from "../lib/geocode";
+import { searchPlaces, placeText, type Place } from "../lib/geocode";
 import { interpolate } from "../lib/i18n";
 import type { ModelDef } from "../api/models";
 import { useI18n } from "../i18nContext";
+import { MapPicker } from "./MapPicker";
 
 type Props = {
   disabled: boolean;
@@ -11,11 +12,11 @@ type Props = {
   /** Optional second action per result: add the place to the compare board
    * instead of loading it. The menu stays open so several can be added. */
   onCompare?: (pin: { lat: number; lon: number; name: string }) => void;
+  /** Center of the map picker: the place the page currently shows. */
+  center: { lat: number; lon: number };
   /** DOM id for the input (must be unique per page). */
   id?: string;
-  /** Visible uppercase label; omit to render only the input. */
-  label?: string;
-  /** Accessible name when the visible label is omitted. */
+  /** Accessible name of the input. */
   ariaLabel?: string;
   placeholder?: string;
   compact?: boolean;
@@ -26,14 +27,13 @@ export function PlaceSearch({
   model,
   onPick,
   onCompare,
+  center,
   id = "place",
-  label,
   ariaLabel,
   placeholder,
   compact = false,
 }: Props) {
   const { t } = useI18n();
-  const shownLabel = label === undefined ? t.placeLabel : label;
   const shownPlaceholder = placeholder ?? t.placePlaceholder;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Place[]>([]);
@@ -41,6 +41,7 @@ export function PlaceSearch({
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [mapOpen, setMapOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const trimmed = query.trim();
@@ -94,7 +95,7 @@ export function PlaceSearch({
     onCompare?.({
       lat: place.lat,
       lon: place.lon,
-      name: place.detail ? `${place.label}, ${place.detail}` : place.label,
+      name: placeText(place),
     });
   }
 
@@ -119,49 +120,35 @@ export function PlaceSearch({
 
   return (
     <div className={compact ? "place-search is-compact" : "place-search"} ref={boxRef}>
-      {shownLabel ? (
-        <label className="place-search-field">
-          {shownLabel}
-          <input
-            id={id}
-            type="search"
-            placeholder={shownPlaceholder}
-            autoComplete="off"
-            spellCheck={false}
-            value={query}
-            disabled={disabled}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => {
-              if (results.length > 0) setOpen(true);
-            }}
-            onKeyDown={onKeyDown}
-            role="combobox"
-            aria-expanded={showMenu}
-            aria-controls={`${id}-results`}
-            aria-autocomplete="list"
-          />
-        </label>
-      ) : (
-        <input
-          id={id}
-          type="search"
-          aria-label={ariaLabel ?? shownPlaceholder}
-          placeholder={shownPlaceholder}
-          autoComplete="off"
-          spellCheck={false}
-          value={query}
-          disabled={disabled}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setOpen(true);
-          }}
-          onKeyDown={onKeyDown}
-          role="combobox"
-          aria-expanded={showMenu}
-          aria-controls={`${id}-results`}
-          aria-autocomplete="list"
-        />
-      )}
+      <input
+        id={id}
+        type="search"
+        aria-label={ariaLabel ?? shownPlaceholder}
+        placeholder={shownPlaceholder}
+        autoComplete="off"
+        spellCheck={false}
+        value={query}
+        disabled={disabled}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => {
+          if (results.length > 0) setOpen(true);
+        }}
+        onKeyDown={onKeyDown}
+        role="combobox"
+        aria-expanded={showMenu}
+        aria-controls={`${id}-results`}
+        aria-autocomplete="list"
+      />
+      {/* every place input carries the map: picking on the map routes to
+          the same handler as picking a suggestion */}
+      <button
+        type="button"
+        className="btn place-map"
+        disabled={disabled}
+        onClick={() => setMapOpen(true)}
+      >
+        {t.mapOpen}
+      </button>
       {showMenu ? (
         <ul className="place-menu" id={`${id}-results`} role="listbox">
           {searching && results.length === 0 ? (
@@ -202,6 +189,18 @@ export function PlaceSearch({
             </li>
           ))}
         </ul>
+      ) : null}
+      {mapOpen ? (
+        <MapPicker
+          lat={center.lat}
+          lon={center.lon}
+          model={model}
+          onCancel={() => setMapOpen(false)}
+          onPick={(lat, lon, name) => {
+            setMapOpen(false);
+            onPick({ lat, lon, label: name ?? "", detail: "" });
+          }}
+        />
       ) : null}
     </div>
   );

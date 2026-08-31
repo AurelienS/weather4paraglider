@@ -39,3 +39,29 @@ export function loadFavorites(): Favorite[] {
 export function storeFavorites(list: Favorite[]): void {
   storeVersioned(KEY, list, VERSION);
 }
+
+/** Recently visited places, shown on the main page: same shape as
+ * favorites, recorded on every place selection, most recent first. */
+export const RECENT_KEY = "w4p.recentPlaces.v1";
+export const RECENT_VERSION = 1;
+export const MAX_RECENT_PLACES = 10;
+
+export function loadRecentPlaces(): Favorite[] {
+  const outcome = loadVersioned<Favorite[]>(RECENT_KEY, {
+    current: RECENT_VERSION,
+    parse: parseList,
+  });
+  return outcome.data ?? [];
+}
+
+export function storeRecentPlaces(list: Favorite[]): void {
+  storeVersioned(RECENT_KEY, list, RECENT_VERSION);
+}
+
+/** Record a place visit: same coordinates move to the front with the fresh
+ * label, the list is capped. */
+export function recordRecentPlace(list: Favorite[], pin: Favorite): Favorite[] {
+  const key = (p: { lat: number; lon: number }) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`;
+  const filtered = list.filter((p) => key(p) !== key(pin));
+  return [{ ...pin }, ...filtered].slice(0, MAX_RECENT_PLACES);
+}

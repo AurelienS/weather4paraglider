@@ -1,7 +1,6 @@
 import type { Dict } from "./en";
 
 export const de: Dict = {
-  brandSub: "Windgram & Sounding pro Modell · Open-Meteo Multi-Modell",
   themeToLight: "Zum hellen Design wechseln",
   themeToDark: "Zum dunklen Design wechseln",
   langLabel: "Sprache",
@@ -13,7 +12,7 @@ export const de: Dict = {
   addFavoriteAria: "Aktuellen Ort zu den Favoriten hinzufügen",
   metaCell: "Zelle {lat}, {lon}",
   metaAlt: "Modellhöhe {m} m",
-  metaCache: "Cache {slot} UTC",
+  metaCache: "Run {slot} UTC",
   modelLabel: "Modell",
   modelGroupNowcast: "Nowcast — nächste Stunden",
   modelGroupLowLevel: "Präzise in Bodennähe",
@@ -25,14 +24,25 @@ export const de: Dict = {
   viewWindgram: "Windgram",
   viewSounding: "Sounding",
   hourLabel: "Uhrzeit",
-  hintLevels: "250-m-Grid zwischen den Modellhöhen interpoliert",
+  navAria: "Hauptseiten",
+  tabPlace: "Ort",
+  tabGuide: "Guide",
+  compareModels: "Modelle vergleichen",
+  recentPlaces: "Letzte Orte",
   boardAria: "Vergleichstafel",
-  compareBack: "Zurück zum Ort",
   historyLabel: "Letzte",
+  models: "Modelle ({n})",
   boardOne: "Vergleich · 1 Ort",
   boardMany: "Vergleich · {n} Orte",
+  boardOneModel: "1 Modell",
+  boardModels: "{n} Modelle",
+  boardEmptyPlaces: "Orte zum Vergleichen auswählen…",
+  boardEmptyModels: "Modelle zum Vergleichen auswählen…",
+  boardAverage: "Mittel",
   boardAddAria: "Ort zum Vergleich hinzufügen",
   boardAddPlaceholder: "Ort zum Vergleichen hinzufügen…",
+  boardSwitchAria: "Den Ort des Modellvergleichs wechseln",
+  boardSwitchPlaceholder: "Ort wechseln…",
   addCompareAria: "{label} zum Vergleich hinzufügen",
   addCompare: "Zum Vergleich hinzufügen",
   boardClear: "Alle entfernen",
@@ -49,7 +59,6 @@ export const de: Dict = {
   mapOpen: "Karte…",
   refresh: "Aktualisieren",
   compareCheck: "Orte vergleichen",
-  compareHint: "Mehrere Orte auf einer Seite stapeln",
   mapAria: "Punkt auf der Karte wählen",
   mapTitle: "Punkt wählen",
   mapHint: "Karte anklicken oder ziehen — Esc zum Schließen",
@@ -101,6 +110,7 @@ export const de: Dict = {
   loading: "Lädt…",
   noDataDay: "Keine Daten für diesen Tag.",
   pinAlt: "Höhe {m} m",
+  pinRun: "Run {day} {slot} UTC",
   errNoData:
     "{model} hat keine Daten für diesen Ort: Dieses Modell deckt ein kleineres " +
     "Gebiet ab. Wähle ein anderes Modell in der Werkzeugleiste (AROME deckt ganz " +
@@ -115,8 +125,6 @@ export const de: Dict = {
     "Versuche es gleich noch einmal — die Daten sollten zurückkommen.",
   errNetwork: "Open-Meteo nicht erreichbar — prüfe deine Internetverbindung.",
   errUnexpected: "Ein unerwarteter Fehler ist aufgetreten.",
-  guideOpen: "Erste Schritte",
-  guideBack: "Zurück zur App",
   guideTitle: "Erste Schritte",
   guideIntro:
     "Weather4Paragliding verwandelt freie numerische Wettermodelle in ein Windgram " +

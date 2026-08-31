@@ -32,12 +32,11 @@ describe("parseBootstrap", () => {
     });
   });
 
-  test("compare mode guarantees the current place sits on the board", () => {
+  test("a bare compare URL boots the empty board placeholder", () => {
     const boot = parseBootstrap("?lat=45.8992&lon=6.1294&compare=1");
     expect(boot.compare).toBe(true);
-    expect(boot.entries).toEqual([
-      { kind: "place", lat: 45.8992, lon: 6.1294 },
-    ]);
+    // boards are never seeded from the URL: the user picks what to compare
+    expect(boot.entries).toEqual([]);
   });
 
   test("compare mode with explicit pins keeps them and appends the place", () => {
@@ -55,6 +54,32 @@ describe("parseBootstrap", () => {
     const boot = parseBootstrap("?lat=45.9&lon=6.7&compare=0&pins=46,7");
     expect(boot.compare).toBe(false);
     expect(boot.entries).toEqual([{ kind: "place", lat: 46, lon: 7 }]);
+  });
+
+  test("compare=models keeps only model entries and never anchors a place", () => {
+    const boot = parseBootstrap(
+      "?lat=45.9&lon=6.7&compare=models&pins=model:icon_d2;46.0000,7.0000/Annecy",
+    );
+    expect(boot.compare).toBe(true);
+    expect(boot.mode).toBe("model");
+    expect(boot.entries).toEqual([{ kind: "model", modelId: "icon_d2" }]);
+  });
+
+  test("compare=1 keeps only place entries and appends the place", () => {
+    const boot = parseBootstrap(
+      "?lat=45.9&lon=6.7&compare=1&pins=46.0000,7.0000/Annecy;model:icon_d2",
+    );
+    expect(boot.mode).toBe("place");
+    expect(boot.entries).toEqual([
+      { kind: "place", lat: 46, lon: 7, name: "Annecy" },
+      { kind: "place", lat: 45.9, lon: 6.7 },
+    ]);
+  });
+
+  test("a model URL without models boots the empty board placeholder", () => {
+    const boot = parseBootstrap("?lat=45.9&lon=6.7&model=icon_d2&compare=models");
+    expect(boot.mode).toBe("model");
+    expect(boot.entries).toEqual([]);
   });
 });
 
@@ -91,12 +116,17 @@ describe("migrateCompareV1", () => {
     ).toEqual({
       on: true,
       entries: [{ kind: "place", lat: 45.9231, lon: 6.8692, name: "Chamonix" }],
+      showAverage: false,
     });
   });
 
   test("malformed v1 data is discarded", () => {
     expect(migrateCompareV1(null)).toBeNull();
     expect(migrateCompareV1("junk")).toBeNull();
-    expect(migrateCompareV1({ pins: "nope" })).toEqual({ on: false, entries: [] });
+    expect(migrateCompareV1({ pins: "nope" })).toEqual({
+      on: false,
+      entries: [],
+      showAverage: false,
+    });
   });
 });
