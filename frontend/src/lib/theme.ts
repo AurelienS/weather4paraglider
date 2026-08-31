@@ -24,7 +24,12 @@ export function storeTheme(theme: Theme, store: StorageLike | undefined = storag
   }
 }
 
-export function applyTheme(theme: Theme, doc: Document = window.document): void {
+export function applyTheme(
+  theme: Theme,
+  doc: Document | undefined =
+    typeof window === "undefined" ? undefined : window.document,
+): void {
+  if (!doc) return;
   doc.documentElement.dataset.theme = theme;
 }
 

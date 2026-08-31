@@ -1,5 +1,6 @@
-import { createContext, useContext } from "react";
-import type { Dict, Lang } from "./lib/i18n";
+import { useMemo } from "react";
+import { dict, type Dict, type Lang } from "./lib/i18n";
+import { useStore } from "./stores";
 
 export type I18n = {
   lang: Lang;
@@ -7,10 +8,10 @@ export type I18n = {
   t: Dict;
 };
 
-export const I18nContext = createContext<I18n | null>(null);
-
+/** Thin view over the prefs store, kept for the existing call sites. */
 export function useI18n(): I18n {
-  const ctx = useContext(I18nContext);
-  if (!ctx) throw new Error("useI18n must be used inside <I18nProvider>");
-  return ctx;
+  const lang = useStore((s) => s.lang);
+  const setLang = useStore((s) => s.setLang);
+  const t = useMemo(() => dict(lang), [lang]);
+  return { lang, setLang, t };
 }

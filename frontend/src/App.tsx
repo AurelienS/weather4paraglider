@@ -1,41 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchArome } from "./api/client";
-import type { AromeResponse } from "./api/types";
-import {
-  DEFAULT_MODEL,
-  MODELS,
-  isModelId,
-  modelById,
-  type ModelId,
-} from "./api/models";
-import { PinCard, type PinState } from "./components/PinCard";
-import { FavoritesMenu } from "./components/FavoritesMenu";
+import { useEffect, useMemo, useState } from "react";
+import { MODELS, isModelId } from "./api/models";
+import { CompareBoard } from "./components/CompareBoard";
 import { Guide } from "./components/Guide";
-import { PlaceSearch } from "./components/PlaceSearch";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
-import {
-  DEMO_POINT,
-  groupByDay,
-  hourLabel,
-  selectionAfterLoad,
-  utcSlot,
-} from "./lib/format";
-import { loadFavorites, storeFavorites, type Favorite } from "./lib/favorites";
-import { placeText, reverseGeocode } from "./lib/geocode";
-import { addPin, encodePins, parsePins, pinKey, type Pin } from "./lib/pins";
-import { applyTheme, loadTheme, otherTheme, storeTheme, type Theme } from "./lib/theme";
+import { groupByDay, hourLabel, utcSlot } from "./lib/format";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
-import { loadVersioned, storeVersioned } from "./lib/storage";
-import { useI18n } from "./i18nContext";
+import { pinKey } from "./lib/pins";
 import { useIsMobile } from "./lib/useIsMobile";
-
-type Point = { lat: number; lon: number };
-type View = "windgram" | "sounding";
-
-const COMPARE_KEY = "w4p.compare.v1";
+import { useStore } from "./stores";
+import { storeCompare, writeStateToUrl } from "./stores/url";
+import { useI18n } from "./i18nContext";
 
 // language names are shown in their own language, whatever the UI language
 const LANG_NAMES: Record<Lang, string> = {
@@ -54,118 +31,40 @@ const MODEL_GROUP_ORDER = ["allAltitude", "lowLevel", "nowcast", "longRange"] as
 const Z_MAX_M = 5000;
 type ModelGroup = (typeof MODEL_GROUP_ORDER)[number];
 
-function readPointFromUrl(): Point {
-  const q = new URLSearchParams(window.location.search);
-  const lat = q.get("lat") == null ? NaN : Number(q.get("lat"));
-  const lon = q.get("lon") == null ? NaN : Number(q.get("lon"));
-  if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
-  return { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon };
-}
-
-function readModelFromUrl(): ModelId {
-  const q = new URLSearchParams(window.location.search);
-  const raw = q.get("model");
-  return raw != null && isModelId(raw) ? raw : DEFAULT_MODEL;
-}
-
-type CompareStore = { on: boolean; pins: Pin[] };
-
-const COMPARE_VERSION = 1;
-
-function parseCompare(data: unknown): CompareStore | null {
-  if (data == null || typeof data !== "object") return null;
-  const rec = data as Record<string, unknown>;
-  const pins = Array.isArray(rec.pins)
-    ? (rec.pins as Pin[]).filter(
-        (p) => p && typeof p.lat === "number" && typeof p.lon === "number",
-      )
-    : [];
-  return { on: rec.on === true, pins };
-}
-
-function readCompareStore(): CompareStore {
-  const outcome = loadVersioned<CompareStore>(COMPARE_KEY, {
-    current: COMPARE_VERSION,
-    parse: parseCompare,
-  });
-  return outcome.data ?? { on: false, pins: [] };
-}
-
-function readInitialCompare(): boolean {
-  const q = new URLSearchParams(window.location.search);
-  if (q.get("compare") != null) return q.get("compare") === "1";
-  return readCompareStore().on;
-}
-
-function readInitialPins(): Pin[] {
-  const q = new URLSearchParams(window.location.search);
-  const raw = q.get("pins");
-  if (raw != null) return parsePins(raw);
-  return readCompareStore().pins;
-}
-
-// evaluated once at startup; keeps the invariant that in compare mode the
-// current place is always among the pins
-const INITIAL = (() => {
-  const point = readPointFromUrl();
-  const compare = readInitialCompare();
-  let pins = readInitialPins();
-  if (compare && !pins.some((p) => pinKey(p) === pinKey(point))) {
-    pins = addPin(pins, { lat: point.lat, lon: point.lon });
-  }
-  return { point, compare, pins };
-})();
-
-function writeStateToUrl(point: Point, modelId: ModelId, compare: boolean, pins: Pin[]) {
-  const url = new URL(window.location.href);
-  const isHome =
-    point.lat === DEMO_POINT.lat &&
-    point.lon === DEMO_POINT.lon &&
-    modelId === DEFAULT_MODEL &&
-    !compare &&
-    pins.length === 0;
-  const params = new URLSearchParams();
-  if (!isHome) {
-    params.set("lat", String(point.lat));
-    params.set("lon", String(point.lon));
-    params.set("model", modelId);
-  }
-  if (compare) params.set("compare", "1");
-  let search = params.toString();
-  // append pins manually: encodePins output is already URI-safe and must not be
-  // re-encoded by URLSearchParams (which would turn %20 into %2520)
-  if (compare && pins.length > 0) search += `&pins=${encodePins(pins)}`;
-  url.search = search;
-  window.history.replaceState(null, "", url);
-}
-
 export default function App() {
   const { lang, setLang, t } = useI18n();
-  const [point, setPoint] = useState<Point>(readPointFromUrl);
-  const [modelId, setModelId] = useState<ModelId>(readModelFromUrl);
-  const [place, setPlace] = useState<string | null>(null);
-  const [bump, setBump] = useState(0);
-  const forceRef = useRef(false);
-  const [data, setData] = useState<AromeResponse | null>(null);
-  const [day, setDay] = useState<string | null>(null);
-  const [hourIdx, setHourIdx] = useState(0);
-  const dayRef = useRef<string | null>(null);
-  const hourTimeRef = useRef<string | null>(null);
-  const carryRef = useRef(false);
-  const [activeZ, setActiveZ] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>("windgram");
-  const [compare, setCompare] = useState<boolean>(INITIAL.compare);
-  const [pins, setPins] = useState<Pin[]>(INITIAL.pins);
-  const [pinStates, setPinStates] = useState<Record<string, PinState>>({});
-  const [favs, setFavs] = useState<Favorite[]>(loadFavorites);
-  const [theme, setTheme] = useState<Theme>(loadTheme);
+
+  const modelId = useStore((s) => s.modelId);
+  const data = useStore((s) => s.data);
+  const error = useStore((s) => s.error);
+  const loading = useStore((s) => s.loading);
+  const selectModel = useStore((s) => s.selectModel);
+  const refresh = useStore((s) => s.refresh);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+
+  const point = useStore((s) => s.point);
+  const place = useStore((s) => s.place);
+
+  const day = useStore((s) => s.day);
+  const hourIdx = useStore((s) => s.hourIdx);
+  const view = useStore((s) => s.view);
+  const activeZ = useStore((s) => s.activeZ);
+  const setActiveZ = useStore((s) => s.setActiveZ);
+  const setView = useStore((s) => s.setView);
+  const selectDay = useStore((s) => s.selectDay);
+  const selectHourTime = useStore((s) => s.selectHourTime);
+
+  const compare = useStore((s) => s.compare);
+  const pins = useStore((s) => s.pins);
+
+  const favs = useStore((s) => s.favs);
+  const theme = useStore((s) => s.theme);
+  const addFavorite = useStore((s) => s.addFavorite);
+
+  const isMobile = useIsMobile();
   const [guide, setGuide] = useState(
     () => new URLSearchParams(window.location.search).get("guide") === "1",
   );
-  const forcePinsRef = useRef(false);
-  const isMobile = useIsMobile();
 
   const MODEL_GROUP_LABEL: Record<ModelGroup, string> = {
     nowcast: t.modelGroupNowcast,
@@ -175,10 +74,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
     function onPop() {
       setGuide(new URLSearchParams(window.location.search).get("guide") === "1");
     }
@@ -186,20 +81,20 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // a shared URL carries bare coordinates: look up the place name once so
-  // the header shows "Chamonix-Mont-Blanc" instead of "45.9546°N 6.7539°E"
+  // initial place name and first load; re-runs of this effect (StrictMode)
+  // abort the previous loads, as the old effect cleanup did
   useEffect(() => {
-    if (place != null) return;
-    const ctl = new AbortController();
-    reverseGeocode(point.lat, point.lon, ctl.signal)
-      .then((p) => {
-        if (p) setPlace(placeText(p));
-      })
-      .catch(() => {
-        // offline or Photon down: keep the coordinate fallback
-      });
-    return () => ctl.abort();
-  }, [point.lat, point.lon, place]);
+    const store = useStore.getState();
+    store.ensurePlace();
+    store.loadMain();
+    store.loadPins();
+  }, []);
+
+  // keep the URL and the compare board in sync with the state
+  useEffect(() => {
+    writeStateToUrl(point, modelId, compare, pins);
+    storeCompare(compare, pins);
+  }, [point, modelId, compare, pins]);
 
   function openGuide() {
     const url = new URL(window.location.href);
@@ -215,107 +110,18 @@ export default function App() {
     setGuide(false);
   }
 
+  function goHome(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    setGuide(false);
+    useStore.getState().goHome();
+  }
+
   const favKey = `${point.lat.toFixed(4)},${point.lon.toFixed(4)}`;
   const placeSaved = favs.some((f) => `${f.lat.toFixed(4)},${f.lon.toFixed(4)}` === favKey);
 
-  function addFavorite() {
-    if (placeSaved) return;
-    const next = [
-      {
-        lat: point.lat,
-        lon: point.lon,
-        label:
-          place ??
-          mainPinName ??
-          `${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}`,
-      },
-      ...favs,
-    ];
-    setFavs(next);
-    storeFavorites(next);
-  }
-
-  function removeFavorite(fav: Favorite) {
-    const next = favs.filter((f) => f !== fav);
-    setFavs(next);
-    storeFavorites(next);
-  }
-
-  useEffect(() => {
-    writeStateToUrl({ lat: point.lat, lon: point.lon }, modelId, compare, pins);
-    storeVersioned(COMPARE_KEY, { on: compare, pins }, COMPARE_VERSION);
-  }, [point.lat, point.lon, modelId, compare, pins]);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    const force = forceRef.current;
-    forceRef.current = false;
-    const carry = carryRef.current;
-    carryRef.current = false;
-
-    fetchArome(point.lat, point.lon, modelId, { force, signal: ac.signal, lang })
-      .then((payload) => {
-        if (ac.signal.aborted) return;
-        const next = carry
-          ? selectionAfterLoad(payload.hours, dayRef.current, hourTimeRef.current)
-          : selectionAfterLoad(payload.hours, null, null);
-        setData(payload);
-        setHourIdx(next.hourIdx);
-        setDay(next.day);
-        setActiveZ(null);
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        const message =
-          err instanceof Error && err.message ? err.message : t.errUnexpected;
-        setError(message);
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setLoading(false);
-      });
-
-    return () => ac.abort();
-  }, [point.lat, point.lon, modelId, bump, lang, t]);
-
-  useEffect(() => {
-    if (!compare || pins.length === 0) return;
-    const ac = new AbortController();
-    const force = forcePinsRef.current;
-    forcePinsRef.current = false;
-    let alive = true;
-    for (const pin of pins) {
-      const key = pinKey(pin);
-      fetchArome(pin.lat, pin.lon, modelId, { force, signal: ac.signal, lang })
-        .then((payload) => {
-          if (!alive) return;
-          setPinStates((s) => ({ ...s, [key]: { status: "ready", data: payload } }));
-        })
-        .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === "AbortError") return;
-          if (!alive) return;
-          const message =
-            err instanceof Error && err.message ? err.message : t.errUnexpected;
-          setPinStates((s) => ({ ...s, [key]: { status: "error", message } }));
-        });
-    }
-    return () => {
-      alive = false;
-      ac.abort();
-    };
-  }, [compare, pins, modelId, bump, lang, t]);
-
-  const mainKey = pinKey({ lat: point.lat, lon: point.lon });
-  const mainPinned = pins.some((p) => pinKey(p) === mainKey);
+  const mainKey = pinKey(point);
   // reuse the pin's stored name when the place label is not known (e.g. reload)
   const mainPinName = pins.find((p) => pinKey(p) === mainKey)?.name;
-
-  function selectModel(next: ModelId) {
-    if (next === modelId) return;
-    carryRef.current = true;
-    setLoading(true);
-    setError(null);
-    setModelId(next);
-  }
 
   const days = useMemo(
     () => (data ? groupByDay(data.hours, lang) : []),
@@ -324,51 +130,6 @@ export default function App() {
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
   const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
   const hour = dayHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? dayHours[0];
-
-  useEffect(() => {
-    dayRef.current = day;
-    hourTimeRef.current = hour?.time ?? null;
-  });
-
-  function selectDay(key: string) {
-    setDay(key);
-    const first = days.find((d) => d.key === key)?.hours[0];
-    if (!data || !first) return;
-    const idx = data.hours.findIndex((h) => h.time === first.time);
-    if (idx >= 0) setHourIdx(idx);
-  }
-
-  function refresh() {
-    setLoading(true);
-    setError(null);
-    carryRef.current = true;
-    forceRef.current = true;
-    forcePinsRef.current = true;
-    setBump((n) => n + 1);
-  }
-
-  function goHome(e: React.MouseEvent<HTMLAnchorElement>) {
-    e.preventDefault();
-    setGuide(false);
-    setCompare(false);
-    setPins([]);
-    setPlace(null);
-    setDay(null);
-    setHourIdx(0);
-    setView("windgram");
-    setModelId(DEFAULT_MODEL);
-    setPoint(DEMO_POINT);
-  }
-
-  function toggleCompare(next: boolean) {
-    setCompare(next);
-    // entering compare mode: the current place joins the board
-    if (next && !mainPinned) {
-      setPins((prev) =>
-        addPin(prev, { lat: point.lat, lon: point.lon, name: place ?? undefined }),
-      );
-    }
-  }
 
   return (
     <div className="app">
@@ -392,11 +153,7 @@ export default function App() {
             className="theme-btn"
             aria-label={theme === "dark" ? t.themeToLight : t.themeToDark}
             title={theme === "dark" ? t.themeToLight : t.themeToDark}
-            onClick={() => {
-              const next = otherTheme(theme);
-              storeTheme(next);
-              setTheme(next);
-            }}
+            onClick={toggleTheme}
           >
             {theme === "dark" ? "☀" : "☾"}
           </button>
@@ -430,30 +187,7 @@ export default function App() {
               </button>
             </div>
           </div>
-          <SiteForm
-            lat={point.lat}
-            lon={point.lon}
-            model={modelById(modelId)}
-            loading={loading}
-            compare={compare}
-            favs={favs}
-            onFavoriteRemove={removeFavorite}
-            onCompareChange={toggleCompare}
-            onSubmit={(lat, lon, label) => {
-              setLoading(true);
-              setError(null);
-              setPlace(label ?? null);
-              // in compare mode every loaded place joins the board
-              if (compare) {
-                setPins((prev) =>
-                  addPin(prev, { lat, lon, name: label ?? undefined }),
-                );
-              }
-              if (lat === point.lat && lon === point.lon) setBump((n) => n + 1);
-              else setPoint({ lat, lon });
-            }}
-            onRefresh={refresh}
-          />
+          <SiteForm />
         </div>
       </header>
 
@@ -569,10 +303,7 @@ export default function App() {
                 {t.hourLabel}
                 <select
                   value={hour?.time ?? ""}
-                  onChange={(e) => {
-                    const idx = data.hours.findIndex((h) => h.time === e.target.value);
-                    if (idx >= 0) setHourIdx(idx);
-                  }}
+                  onChange={(e) => selectHourTime(e.target.value)}
                 >
                   {dayHours.map((h) => (
                     <option key={h.time} value={h.time}>
@@ -603,79 +334,13 @@ export default function App() {
           <p className="hint-keys">{t.hintLevels}</p>
 
           {compare ? (
-            <section className="board" aria-label={t.boardAria}>
-              <div className="board-head">
-                <h2>
-                  {pins.length > 1
-                    ? interpolate(t.boardMany, { n: pins.length })
-                    : t.boardOne}
-                </h2>
-                <div className="board-tools">
-                  <PlaceSearch
-                    disabled={false}
-                    compact
-                    id="board-place"
-                    label=""
-                    ariaLabel={t.boardAddAria}
-                    placeholder={t.boardAddPlaceholder}
-                    model={modelById(modelId)}
-                    onPick={(p) =>
-                      setPins((prev) =>
-                        addPin(prev, {
-                          lat: p.lat,
-                          lon: p.lon,
-                          name: `${p.label}, ${p.detail}`,
-                        }),
-                      )
-                    }
-                  />
-                  <FavoritesMenu
-                    list={favs}
-                    currentKey={favKey}
-                    disabledKeys={pins.map(pinKey)}
-                    onPick={(fav) =>
-                      setPins((prev) =>
-                        addPin(prev, { lat: fav.lat, lon: fav.lon, name: fav.label }),
-                      )
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() =>
-                      setPins([
-                        { lat: point.lat, lon: point.lon, name: place ?? undefined },
-                      ])
-                    }
-                  >
-                    {t.boardClear}
-                  </button>
-                </div>
-              </div>
-              <div className="board-list">
-                {pins.map((pin) => {
-                  const key = pinKey(pin);
-                  const isCurrent = key === mainKey;
-                  return (
-                    <PinCard
-                      key={key}
-                      pin={pin}
-                      state={pinStates[key]}
-                      dayKey={activeDay ?? null}
-                      hourTime={hour?.time ?? null}
-                      view={view}
-                      zMax={Z_MAX_M}
-                      compact={isMobile}
-                      onRemove={() => {
-                        // removing the current place ends the comparison
-                        if (isCurrent) setCompare(false);
-                        setPins((prev) => prev.filter((p) => pinKey(p) !== key));
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </section>
+            <CompareBoard
+              dayKey={activeDay ?? null}
+              hourTime={hour?.time ?? null}
+              view={view}
+              zMax={Z_MAX_M}
+              compact={isMobile}
+            />
           ) : null}
 
           {data.warnings.length > 0 ? (

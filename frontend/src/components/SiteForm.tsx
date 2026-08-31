@@ -1,52 +1,41 @@
 import { useState } from "react";
 import type { Favorite } from "../lib/favorites";
 import type { Place } from "../lib/geocode";
-import { type ModelDef } from "../api/models";
+import { modelById } from "../api/models";
 import { useI18n } from "../i18nContext";
+import { useStore } from "../stores";
 import { FavoritesMenu } from "./FavoritesMenu";
 import { MapPicker } from "./MapPicker";
 import { PlaceSearch } from "./PlaceSearch";
 
-type Props = {
-  lat: number;
-  lon: number;
-  model: ModelDef;
-  loading: boolean;
-  compare: boolean;
-  favs: Favorite[];
-  onFavoriteRemove: (fav: Favorite) => void;
-  onCompareChange: (next: boolean) => void;
-  onSubmit: (lat: number, lon: number, label?: string | null) => void;
-  onRefresh: () => void;
-};
-
-export function SiteForm({
-  lat,
-  lon,
-  model,
-  loading,
-  compare,
-  favs,
-  onFavoriteRemove,
-  onCompareChange,
-  onSubmit,
-  onRefresh,
-}: Props) {
+/** The header form, wired directly to the store: place search, map picking,
+ * favorites, refresh and the compare switch. */
+export function SiteForm() {
   const { t } = useI18n();
+  const lat = useStore((s) => s.point.lat);
+  const lon = useStore((s) => s.point.lon);
+  const modelId = useStore((s) => s.modelId);
+  const loading = useStore((s) => s.loading);
+  const compare = useStore((s) => s.compare);
+  const favs = useStore((s) => s.favs);
+  const submitPlace = useStore((s) => s.submitPlace);
+  const toggleCompare = useStore((s) => s.toggleCompare);
+  const removeFavorite = useStore((s) => s.removeFavorite);
+  const refresh = useStore((s) => s.refresh);
   const [mapOpen, setMapOpen] = useState(false);
 
   function pickPlace(place: Place) {
-    onSubmit(place.lat, place.lon, `${place.label}, ${place.detail}`);
+    submitPlace(place.lat, place.lon, `${place.label}, ${place.detail}`);
   }
 
   function pickFavorite(fav: Favorite) {
-    onSubmit(fav.lat, fav.lon, fav.label);
+    submitPlace(fav.lat, fav.lon, fav.label);
   }
 
   return (
     <div className="site-form">
       <div className="site-form-place-row">
-        <PlaceSearch disabled={loading} model={model} onPick={pickPlace} />
+        <PlaceSearch disabled={loading} model={modelById(modelId)} onPick={pickPlace} />
         <button
           type="button"
           className="btn"
@@ -61,16 +50,21 @@ export function SiteForm({
           list={favs}
           currentKey={`${lat.toFixed(4)},${lon.toFixed(4)}`}
           onPick={pickFavorite}
-          onRemove={onFavoriteRemove}
+          onRemove={removeFavorite}
         />
-        <button type="button" className="btn" disabled={loading} onClick={onRefresh}>
+        <button
+          type="button"
+          className="btn"
+          disabled={loading}
+          onClick={refresh}
+        >
           {t.refresh}
         </button>
         <label className="pick pick-check" title={t.compareHint}>
           <input
             type="checkbox"
             checked={compare}
-            onChange={(e) => onCompareChange(e.target.checked)}
+            onChange={(e) => toggleCompare(e.target.checked)}
           />
           {t.compareCheck}
         </label>
@@ -79,11 +73,11 @@ export function SiteForm({
         <MapPicker
           lat={lat}
           lon={lon}
-          model={model}
+          model={modelById(modelId)}
           onCancel={() => setMapOpen(false)}
           onPick={(nextLat, nextLon, label) => {
             setMapOpen(false);
-            onSubmit(nextLat, nextLon, label);
+            submitPlace(nextLat, nextLon, label);
           }}
         />
       ) : null}

@@ -166,6 +166,23 @@ export function pickDefaultHour(hours: readonly { time: string }[]): number {
 
 export type DaySelection = { day: string | null; hourIdx: number };
 
+/** Time (ISO) of the hour the UI currently shows for `day`+`hourIdx`:
+ * the selected hour when it belongs to the active day, otherwise the active
+ * day's first hour. null when there is no data or no day carries data. */
+export function activeHourTime(
+  data: { hours: readonly { time: string }[] } | null,
+  day: string | null,
+  hourIdx: number,
+  lang: Lang = "en",
+): string | null {
+  if (!data) return null;
+  const days = groupByDay(data.hours, lang);
+  const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
+  const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
+  const hour = dayHours.find((h) => h.time === data.hours[hourIdx]?.time) ?? dayHours[0];
+  return hour?.time ?? null;
+}
+
 export function selectionAfterLoad(
   hours: readonly { time: string }[],
   prevDay: string | null,

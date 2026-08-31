@@ -2,15 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { I18nProvider } from './i18n.tsx'
-import { applyTheme, loadTheme } from './lib/theme'
+import { useStore } from './stores'
+import { applyTheme } from './lib/theme'
 
-applyTheme(loadTheme())
+applyTheme(useStore.getState().theme)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <I18nProvider>
-      <App />
-    </I18nProvider>
+    <App />
   </StrictMode>,
 )
