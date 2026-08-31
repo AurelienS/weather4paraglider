@@ -1701,7 +1701,7 @@ select optgroup {
     padding-bottom: 14px;
   }
   .top-bar {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "brand actions"
       "nav nav";
@@ -1717,6 +1717,7 @@ select optgroup {
   .page-nav {
     grid-area: nav;
     justify-self: stretch;
+    min-width: 0;
     overflow-x: auto;
   }
   .top-main {
@@ -1736,15 +1737,45 @@ select optgroup {
     margin-bottom: 2px;
   }
 
-  /* the header zone takes the full width, actions wrap under it */
+  /* the header zone takes the full width; the context row wraps so the
+     title gets its own line and the search/actions shrink or wrap under */
+  .top-main > .site-form,
+  .top-main > .page-header {
+    width: 100%;
+  }
+  .page-header-context {
+    flex-wrap: wrap;
+  }
+  .page-header-context .board-title {
+    flex: 1 1 100%;
+  }
+  .page-header-context .place-search {
+    min-width: 0;
+  }
   .place-search {
     flex: 1 1 auto;
   }
   .place-search input {
     width: 100%;
   }
-  .page-header-actions .pick-check {
-    margin-left: auto;
+
+  /* centered header rows on small screens: the right-hugging desktop
+     alignment leaves awkward gaps once everything stacks */
+  .page-header {
+    align-items: center;
+  }
+  .page-header-context,
+  .page-header-actions {
+    justify-content: center;
+  }
+  .page-header-context .board-title {
+    justify-content: center;
+  }
+
+  /* the page tabs wrap onto two tidy rows instead of scrolling out of view */
+  .page-nav {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   /* toolbar wraps tighter; selects take the row */

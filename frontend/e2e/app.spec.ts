@@ -302,6 +302,70 @@ test("on a phone the windgram is compact and fits without inner scrolling", asyn
   expect(parseFloat(font)).toBeGreaterThanOrEqual(12);
 });
 
+test("on a phone the header stacks, centers and never overflows", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await blockTiles(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const assertCenteredHeader = async () => {
+    // nothing sticks out of the viewport: no horizontal page scroll
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+    // every header row is centered: title, search and actions share the
+    // viewport center line
+    const centers = await page.evaluate(() => {
+      const mid = (el: Element | null) => {
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return Math.round(b.x + b.width / 2);
+      };
+      return {
+        viewport: Math.round(window.innerWidth / 2),
+        title: mid(document.querySelector(".board-title")),
+        search: mid(document.querySelector(".page-header-context .place-search")),
+        actions: mid(document.querySelector(".page-header-actions")),
+      };
+    });
+    expect(centers.viewport).not.toBeNull();
+    for (const key of ["title", "search", "actions"] as const) {
+      if (centers[key] != null) {
+        expect(Math.abs(centers[key]! - centers.viewport!)).toBeLessThanOrEqual(2);
+      }
+    }
+  };
+
+  // place page
+  await page.goto("/");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await assertCenteredHeader();
+
+  // compare places: pinned place card + header controls
+  await page.goto("/?compare=1&pins=45.9450,6.7100/Passy");
+  await expect(page.locator(".board-card").first()).toBeVisible();
+  await assertCenteredHeader();
+
+  // compare models: model menu and average toggle wrap under the title
+  await page.goto("/?compare=models&pins=model:arome_france;model:icon_d2");
+  await expect(page.locator(".board-card").first()).toBeVisible();
+  await assertCenteredHeader();
+
+  // the page tabs wrap onto rows instead of scrolling out of the viewport
+  const nav = await page.locator(".page-nav").evaluate((el) => ({
+    rows: new Set(
+      [...el.querySelectorAll("button")].map(
+        (b) => Math.round(b.getBoundingClientRect().y),
+      ),
+    ).size,
+    scroll: el.scrollWidth,
+  }));
+  expect(nav.scroll).toBeLessThanOrEqual(
+    (await page.locator(".page-nav").evaluate((el) => el.clientWidth)) + 1,
+  );
+  expect(nav.rows).toBeGreaterThanOrEqual(2);
+});
+
 test("reloading reads the localStorage cache without calling Open-Meteo", async ({ page }) => {
   const om = await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
