@@ -236,3 +236,43 @@ export async function mockOpenMeteoGeocode(page: Page): Promise<{ calls: () => n
 export async function blockTiles(page: Page): Promise<void> {
   await page.route("**/tile.openstreetmap.org/**", (route: Route) => route.abort());
 }
+
+export type UmamiEvent = { type: string; url?: string; name?: string; data?: unknown };
+
+/** Analytics turned on and pointed at a same-origin stub: no real network.
+ * Installs the runtime config (`window.W4P_ANALYTICS`) the app reads at
+ * startup and serves a fake Umami tracker that records every track() call
+ * in `window.__umamiEvents`. `events()` re-reads the browser list. */
+export async function mockUmami(page: Page): Promise<{ events: () => Promise<UmamiEvent[]> }> {
+  await page.addInitScript(() => {
+    (window as { W4P_ANALYTICS?: unknown }).W4P_ANALYTICS = {
+      src: "/umami/script.js",
+      websiteId: "e2e-website-id",
+    };
+  });
+  await page.route("**/umami/script.js", (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/javascript",
+      body: `
+        window.__umamiEvents = [];
+        window.umami = {
+          track: (arg, data) => {
+            if (typeof arg === "function") {
+              const props = arg({ url: location.pathname + location.search, referrer: "", website: "" });
+              window.__umamiEvents.push({ type: "pageview", url: props.url });
+            } else if (typeof arg === "string") {
+              window.__umamiEvents.push({ type: "event", name: arg, data });
+            } else {
+              window.__umamiEvents.push({ type: "pageview", url: location.pathname + location.search });
+            }
+          },
+        };
+      `,
+    }),
+  );
+  return {
+    events: () =>
+      page.evaluate(() => (window as unknown as { __umamiEvents: UmamiEvent[] }).__umamiEvents ?? []),
+  };
+}

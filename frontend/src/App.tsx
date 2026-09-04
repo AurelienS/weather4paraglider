@@ -15,6 +15,7 @@ import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
 import { groupByDay, hourLabel, utcSlot } from "./lib/format";
+import { trackEvent, trackPageView } from "./lib/analytics";
 import { soundingAvailable } from "./api/pipeline";
 import { meteoHoursForDay } from "./lib/meteogram";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
@@ -92,6 +93,12 @@ export default function App() {
     allAltitude: t.modelGroupAllAltitude,
     longRange: t.modelGroupLongRange,
   };
+
+  // page views: place, the two compare boards and the guide; selections
+  // that stay on the same page (day, hour, pin, model) are not page views
+  useEffect(() => {
+    trackPageView(page);
+  }, [page]);
 
   useEffect(() => {
     function onPop() {
@@ -306,7 +313,10 @@ export default function App() {
                       value={modelId}
                       onChange={(e) => {
                         const next = e.target.value;
-                        if (isModelId(next)) selectModel(next);
+                        if (isModelId(next)) {
+                          selectModel(next);
+                          trackEvent("model_selected", { model: next });
+                        }
                       }}
                     >
                       {MODEL_GROUP_ORDER.map((group) => (

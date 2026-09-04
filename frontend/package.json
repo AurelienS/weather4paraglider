@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "e2e": "npm run build && playwright test"
+    "e2e": "npm run build -- --mode e2e && playwright test"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
