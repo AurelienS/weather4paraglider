@@ -1,3 +1,4 @@
+import { pinKey } from "./pins";
 import { loadVersioned, storeVersioned } from "./storage";
 
 export type Favorite = {
@@ -59,11 +60,22 @@ export function storeRecentPlaces(list: Favorite[]): void {
   storeVersioned(RECENT_KEY, list, RECENT_VERSION);
 }
 
+/** Drop recent rows that are already favorites. Match is on four decimals,
+ * the same key the rail uses, so a saved place is not listed twice. */
+export function omitFavoritePlaces(
+  recents: readonly Favorite[],
+  favs: readonly Favorite[],
+): Favorite[] {
+  if (favs.length === 0) return recents.slice();
+  const saved = new Set(favs.map((f) => pinKey(f)));
+  return recents.filter((p) => !saved.has(pinKey(p)));
+}
+
 /** Record a place visit. A place already in the list keeps its index and
  * only refreshes its label, so picking it does not reshuffle the column.
  * A new place is inserted at the front. The list is capped. */
 export function recordRecentPlace(list: Favorite[], pin: Favorite): Favorite[] {
-  const key = (p: { lat: number; lon: number }) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`;
+  const key = (p: { lat: number; lon: number }) => pinKey(p);
   const nextKey = key(pin);
   const idx = list.findIndex((p) => key(p) === nextKey);
   if (idx >= 0) {

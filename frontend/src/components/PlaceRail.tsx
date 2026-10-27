@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { PRIMARY_MODELS, inModelDomain, modelById, type ModelId } from "../api/models";
 import { trackEvent } from "../lib/analytics";
-import type { Favorite } from "../lib/favorites";
+import { omitFavoritePlaces, type Favorite } from "../lib/favorites";
 import { interpolate } from "../lib/i18n";
 import { useI18n } from "../i18nContext";
 import { useStore } from "../stores";
@@ -31,7 +31,8 @@ export function PlaceRail() {
   const modelId = useStore((s) => s.modelId);
   const loading = useStore((s) => s.loading);
   const favs = useStore((s) => s.favs);
-  const recentPlaces = useStore((s) => s.recentPlaces);
+  const storedRecents = useStore((s) => s.recentPlaces);
+  const recentPlaces = omitFavoritePlaces(storedRecents, favs);
   const selectModel = useStore((s) => s.selectModel);
   const submitPlace = useStore((s) => s.submitPlace);
   const removeFavorite = useStore((s) => s.removeFavorite);

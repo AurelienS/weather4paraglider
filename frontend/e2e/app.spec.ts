@@ -764,6 +764,82 @@ test("sounding arrows step through the hours and into the next day", async ({ pa
   await expect(page.locator('.seg[aria-label="Day"] button').nth(1)).toHaveClass(/is-on/);
 });
 
+test("arrow keys walk favorites, switch models, and step the sounding", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhoton(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  const favAdd = page.locator(".fav-add");
+  await page.locator("#place").fill("chamo");
+  await page.locator(".place-menu button:has-text('Chamonix-Mont-Blanc')").click();
+  await favAdd.click();
+  await page.locator("#place").fill("annecy");
+  await page.locator('.place-menu button:has-text("Annecy")').click();
+  await favAdd.click();
+
+  const rows = page.locator(".rail-fav .rail-row");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toHaveClass(/is-current/);
+  await expect(rows.nth(0)).toContainText("Annecy");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".model-plate").nth(1)).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/model=icon_d2/);
+  await expect(page.locator(".place-line strong")).toContainText("Annecy");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".model-plate").first()).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/model=arome_france/);
+
+  // up from the top favorite wraps to the bottom of the list
+  await page.keyboard.press("ArrowUp");
+  await expect(rows.nth(1)).toHaveClass(/is-current/);
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  await expect(page).toHaveURL(/lat=45\.9231/);
+  await page.keyboard.press("ArrowDown");
+  await expect(rows.nth(0)).toHaveClass(/is-current/);
+  await expect(page.locator(".place-line strong")).toContainText("Annecy");
+
+  // the place field does not swallow the desk keys while its menu is closed
+  await page.locator("#place").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(rows.nth(1)).toHaveClass(/is-current/);
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+
+  await page.locator("#place").fill("cha");
+  await expect(page.locator(".place-menu")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  await page.keyboard.press("Escape");
+  await page.locator("#place").fill("");
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".model-plate").nth(1)).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".model-plate").first()).toHaveAttribute("aria-checked", "true");
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  const readout = page.locator(".time-readout");
+  await expect(readout).toBeVisible();
+  const before = await readout.innerText();
+  await page.keyboard.press("ArrowLeft");
+  if ((await readout.innerText()) === before) await page.keyboard.press("ArrowRight");
+  await expect(readout).not.toHaveText(before);
+  await expect(page.locator(".model-plate").first()).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/model=arome_france/);
+
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".place-line strong")).toContainText("Annecy");
+
+  await page.locator('button:has-text("Map…")').click();
+  await expect(page.locator(".map-overlay")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".map-overlay")).toBeVisible();
+  await expect(page.locator(".place-line strong")).toContainText("Annecy");
+});
+
 test("hovering the sounding does not open a scrollbar", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
@@ -808,6 +884,14 @@ test("recent places stay visible and load in one click", async ({ page }) => {
   await expect(page).toHaveURL(/lat=45\.8992/);
   await expect(page.locator(".place-line strong")).toContainText("Annecy");
   await expect(names).toHaveText([/Chamonix-Mont-Blanc/, /^Annecy/]);
+
+  await page.locator(".fav-add").click();
+  await expect(page.locator(".rail-fav .rail-place")).toContainText("Annecy");
+  await expect(page.locator(".rail-recent .rail-place-name")).toHaveText([/Chamonix-Mont-Blanc/]);
+  await page.reload();
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.locator(".rail-fav .rail-place")).toContainText("Annecy");
+  await expect(page.locator(".rail-recent .rail-place-name")).toHaveText([/Chamonix-Mont-Blanc/]);
 });
 
 test("an old compare link opens the place, not a board", async ({ page }) => {

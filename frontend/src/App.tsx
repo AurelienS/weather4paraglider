@@ -9,7 +9,8 @@ import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
 import { useI18n } from "./i18nContext";
-import { trackPageView } from "./lib/analytics";
+import { trackEvent, trackPageView } from "./lib/analytics";
+import { deskHandlesArrow, stepFavorites, stepPrimaryModel } from "./lib/keys";
 import { groupByDay, hourLabel, utcSlot } from "./lib/format";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
 import { meteoHoursForDay } from "./lib/meteogram";
@@ -154,20 +155,61 @@ export default function App() {
     storeCompare(false, [], false);
   }, [point, modelId, compare]);
 
+  // Up and down walk the favorite list. Left and right switch the two
+  // models on the windgram and the meteogram, and step the hour on the
+  // emagram. Capture so the place field does not swallow the keys.
   useEffect(() => {
-    if (view !== "sounding" || guide) return;
+    if (guide) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      const el = e.target as HTMLElement | null;
-      const tag = el?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (el?.isContentEditable) return;
+      const el = e.target instanceof HTMLElement ? e.target : null;
+      if (
+        !deskHandlesArrow(
+          e.key,
+          {
+            tagName: el?.tagName ?? "",
+            id: el?.id ?? "",
+            value: el instanceof HTMLInputElement ? el.value : "",
+            isContentEditable: el?.isContentEditable ?? false,
+          },
+          {
+            mapOpen: document.querySelector(".map-overlay") != null,
+            menuOpen: document.querySelector(".place-menu") != null,
+            modified: e.altKey || e.ctrlKey || e.metaKey || e.shiftKey,
+          },
+        )
+      ) {
+        return;
+      }
+
+      const state = useStore.getState();
+      const delta: -1 | 1 = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        if (state.favs.length === 0) return;
+        e.preventDefault();
+        if (e.repeat) return;
+        const next = stepFavorites(state.favs, state.point.lat, state.point.lon, delta);
+        if (!next) return;
+        el?.blur();
+        state.submitPlace(next.lat, next.lon, next.label);
+        return;
+      }
+
+      if (state.view === "sounding") {
+        e.preventDefault();
+        state.stepHour(delta);
+        return;
+      }
       e.preventDefault();
-      stepHour(e.key === "ArrowLeft" ? -1 : 1);
+      if (e.repeat) return;
+      const next = stepPrimaryModel(state.modelId, delta);
+      if (!next) return;
+      el?.blur();
+      state.selectModel(next);
+      trackEvent("model_selected", { model: next });
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [view, guide, stepHour]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [guide]);
 
   function openGuide() {
     const url = new URL(window.location.href);

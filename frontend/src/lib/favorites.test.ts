@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_RECENT_PLACES, recordRecentPlace, type Favorite } from "./favorites";
+import { MAX_RECENT_PLACES, omitFavoritePlaces, recordRecentPlace, type Favorite } from "./favorites";
 
 const pin = (lat: number, lon: number, label: string): Favorite => ({ lat, lon, label });
 
@@ -19,5 +19,18 @@ describe("recordRecentPlace", () => {
     const next = recordRecentPlace(list, pin(45.9, 6.13, "Annecy-le-Vieux"));
     expect(next.map((p) => p.lat)).toEqual([45.92, 45.9, 45.04]);
     expect(next[1]?.label).toBe("Annecy-le-Vieux");
+  });
+});
+
+describe("omitFavoritePlaces", () => {
+  it("removes a recent that is saved, matching on four decimals", () => {
+    const recents = [pin(45.9231, 6.8692, "Chamonix"), pin(45.8992, 6.1294, "Annecy")];
+    const next = omitFavoritePlaces(recents, [pin(45.92314, 6.86916, "Chamonix-Mont-Blanc")]);
+    expect(next.map((p) => p.label)).toEqual(["Annecy"]);
+  });
+
+  it("keeps the recent list when nothing is saved", () => {
+    const recents = [pin(45.9, 6.13, "Annecy")];
+    expect(omitFavoritePlaces(recents, [])).toEqual(recents);
   });
 });

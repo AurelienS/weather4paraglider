@@ -34,7 +34,12 @@ ICON D2 as two plates, and lists favorites and recent places as one-click
 rows. Search lives there too. An old `?compare=` link opens the place instead
 of a board. State survives reloads and is shareable through the URL
 (point/model in the query string, `src/stores/url.ts`). The sounding steps
-one hour at a time with the arrows beside the chart, including across days.
+one hour at a time with the arrows beside the chart and with the left and
+right keys, including across days. On the windgram and the meteogram those
+keys switch the two models. Up and down walk the favorite list. The place
+search keeps these keys unless its suggestion menu is open, or the caret is
+moving through a typed query. The map, the guide and other fields keep
+their own keys.
 
 ## Commands
 

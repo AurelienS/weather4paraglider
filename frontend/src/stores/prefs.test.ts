@@ -70,6 +70,26 @@ describe("prefs.addFavorite", () => {
     expect(useStore.getState().favs).toHaveLength(1);
   });
 
+  test("starring a place takes it out of the recent list", () => {
+    useStore.setState({
+      recentPlaces: [
+        { lat: 45.8992, lon: 6.1294, label: "Annecy" },
+        { lat: 45.9231, lon: 6.8692, label: "Chamonix" },
+      ],
+    });
+    useStore.getState().addFavorite();
+    expect(useStore.getState().recentPlaces.map((p) => p.label)).toEqual(["Chamonix"]);
+  });
+
+  test("visiting a favorite does not put it back into recents", () => {
+    useStore.setState({
+      favs: [{ lat: 45.8992, lon: 6.1294, label: "Annecy" }],
+      recentPlaces: [{ lat: 45.9231, lon: 6.8692, label: "Chamonix" }],
+    });
+    useStore.getState().addRecentPlace({ lat: 45.8992, lon: 6.1294, label: "Annecy" });
+    expect(useStore.getState().recentPlaces.map((p) => p.label)).toEqual(["Chamonix"]);
+  });
+
   test("removeFavorite drops the entry", () => {
     useStore.getState().addFavorite();
     const fav = useStore.getState().favs[0];

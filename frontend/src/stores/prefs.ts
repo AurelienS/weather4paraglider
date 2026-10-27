@@ -2,6 +2,7 @@
 import {
   loadFavorites,
   loadRecentPlaces,
+  omitFavoritePlaces,
   recordRecentPlace,
   storeFavorites,
   storeRecentPlaces,
@@ -33,10 +34,17 @@ export type PrefsSlice = {
   addRecentPlace: (pin: Favorite) => void;
 };
 
+const initialFavs = loadFavorites();
+const initialRecents = loadRecentPlaces();
+const initialVisibleRecents = omitFavoritePlaces(initialRecents, initialFavs);
+if (initialVisibleRecents.length !== initialRecents.length) {
+  storeRecentPlaces(initialVisibleRecents);
+}
+
 export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
   theme: loadTheme(),
-  favs: loadFavorites(),
-  recentPlaces: loadRecentPlaces(),
+  favs: initialFavs,
+  recentPlaces: initialVisibleRecents,
   lang: loadLang(),
 
   toggleTheme: () => {
@@ -69,7 +77,9 @@ export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
       ...favs,
     ];
     storeFavorites(next);
-    set({ favs: next });
+    const recentPlaces = omitFavoritePlaces(get().recentPlaces, next);
+    storeRecentPlaces(recentPlaces);
+    set({ favs: next, recentPlaces });
   },
 
   removeFavorite: (fav) => {
@@ -79,7 +89,7 @@ export const createPrefsSlice: SliceCreator<PrefsSlice> = (set, get) => ({
   },
 
   addRecentPlace: (pin) => {
-    const next = recordRecentPlace(get().recentPlaces, pin);
+    const next = omitFavoritePlaces(recordRecentPlace(get().recentPlaces, pin), get().favs);
     storeRecentPlaces(next);
     set({ recentPlaces: next });
   },
