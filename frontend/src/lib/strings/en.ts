@@ -78,6 +78,7 @@ export const en = {
   tSoil: "T ground",
   tMissing: "T —",
   tipNeb: "neb {n}%",
+  tipLift: "lift {n} m/s",
   outOfForecast: "out of forecast",
   surfaceAria: "Surface",
   statT2m: "T 2 m",
@@ -180,15 +181,17 @@ export const en = {
     "the speed, from light green to warning red. The small reddish number under " +
     "the speed is the gust, shown only when it adds 5 km/h or more.",
   guideGramP2:
-    "The cell background talks about lift: the warmer it glows, the stronger the " +
-    "thermals the model expects there, and a gray veil means clouds. Hover a cell " +
-    "to read the exact temperature and cloud cover at that altitude, and follow " +
-    "the blue line across the grid — the 0 °C isotherm — to track the freezing " +
-    "level.",
+    "The cell background is the thermal, on a paraglider scale: green is a weak " +
+    "climb, yellow a good one, red a strong one and violet a rough day. A gray " +
+    "veil means clouds. Hover a cell to read the temperature, " +
+    "the updraft in m/s and the cloud cover. That speed is the average climb of a dry " +
+    "thermal before your wing's sink — a cloud overhead can add more, and a strong " +
+    "wind increase with height can tear the thermal apart. Follow the blue line across " +
+    "the grid — the 0 °C isotherm — to track the freezing level.",
     demoSpeed: "wind speed, km/h",
   demoGust: "gust (only when it adds 5 km/h or more)",
   demoArrow: "where the air is heading",
-  demoHover: "hover: temperature, cloud cover",
+  demoHover: "hover: temperature, lift, cloud cover",
   demoIso0: "0 °C isotherm",
   demoScale: "km/h",
   guideSoundTitle: "The sounding, layer by layer",
@@ -200,9 +203,10 @@ export const en = {
   guideSoundP2:
     "Where the orange curve sits left of that line, the surrounding air is colder " +
     "than a rising parcel: it is unstable, thermals climb. Where the curve sits " +
-    "right of the line, the air fights the ascent: it is stable. That is essentially the same layer the windgram tints as convective — the " +
-    "windgram can carry it slightly higher, because humid surface air keeps thermals " +
-    "alive a bit longer than a dry-parcel check.",
+    "right of the line, the air fights the ascent: it is stable. That is essentially " +
+    "the same layer the windgram tints as convective. The tint follows the mixed layer, " +
+    "so the hottest air hugging the ground does not by itself raise it, while humid " +
+    "surface air can carry it a little higher than this dry line.",
   guideSoundP3:
     "Where the orange and blue curves pinch together, the air is nearly saturated: " +
     "that is the cloud base. Hover the chart to read the exact temperature and dew " +

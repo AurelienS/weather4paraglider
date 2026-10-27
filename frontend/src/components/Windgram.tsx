@@ -284,5 +284,9 @@ function WindCell({
 function cellTip(cell: GramCell, t: Dict): string {
   const tTxt = cell.t == null ? t.tMissing : `T ${cell.t.toFixed(1)}°`;
   const neb = interpolate(t.tipNeb, { n: cell.cloud ?? 0 });
+  if (cell.wMs >= 0.3) {
+    const lift = interpolate(t.tipLift, { n: cell.wMs.toFixed(1) });
+    return `${tTxt} · ${lift} · ${neb}`;
+  }
   return `${tTxt} · ${neb}`;
 }

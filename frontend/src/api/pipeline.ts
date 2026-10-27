@@ -1,3 +1,4 @@
+import { upwardHeatFlux } from "../lib/convection";
 import type { OpenMeteoRaw } from "./openmeteo";
 import { type ModelDef } from "./models";
 import type { AromeResponse, Hour, ProfilePoint, Surface } from "./types";
@@ -223,6 +224,12 @@ function surfaceOf(hourly: Hourly, i: number, profile: ProfilePoint[]): Surface 
     cloudHigh: ri(at(hourly, "cloud_cover_high", i)),
     cloudBaseM: estimateCloudBase(profile),
     psfc: r1(at(hourly, "surface_pressure", i)),
+    // ICON/ECMWF publish these fluxes positive downward. Store the flux
+    // into the atmosphere, so a negative value is a stable surface layer
+    // and must not be replaced by the radiation estimate.
+    sensibleUp: upwardHeatFlux(at(hourly, "sensible_heat_flux", i)),
+    latentUp: upwardHeatFlux(at(hourly, "latent_heat_flux", i)),
+    shortwave: r1(at(hourly, "shortwave_radiation", i)),
   };
 }
 

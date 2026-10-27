@@ -1,4 +1,4 @@
-import { cssRgb, thermalRgb, windRgb, type RGB } from "../lib/windgram";
+import { cssRgb, THERMAL_STOPS, thermalRgb, windRgb, type RGB } from "../lib/windgram";
 import { useI18n } from "../i18nContext";
 
 const REPO = "https://github.com/AurelienS/weather4paraglider";
@@ -56,7 +56,7 @@ const DEMO_ROWS: { alt: string; cells: DemoCell[] }[] = [
       { kmh: 3, gust: 0, dir: 230, w: 1.6 },
       { kmh: 5, gust: 11, dir: 232, w: 2.2 },
       { kmh: 8, gust: 0, dir: 235, w: 2.6 },
-      { kmh: 10, gust: 0, dir: 236, w: 2.8 },
+      { kmh: 10, gust: 0, dir: 236, w: 4.2 },
       { kmh: 13, gust: 0, dir: 238, w: 2.4 },
     ],
   },
@@ -185,19 +185,34 @@ function GramDemo() {
 }
 
 function GramScale() {
-  const stops = [0, 8, 12, 22, 32, 42, 55]
+  const wind = [0, 8, 12, 22, 32, 42, 55]
     .map((v) => `${cssRgb(windRgb(v))} ${(v / 55) * 100}%`)
     .join(", ");
+  const liftMax = THERMAL_STOPS[THERMAL_STOPS.length - 1]?.[0] ?? 1;
+  const lift = THERMAL_STOPS.map(([v, rgb]) => `${cssRgb(rgb)} ${(v / liftMax) * 100}%`).join(", ");
   return (
     <div className="gram-scale" aria-hidden="true">
-      <span className="gs-bar" style={{ background: `linear-gradient(90deg, ${stops})` }} />
-      <span className="gs-ticks">
-        <span>0</span>
-        <span>15</span>
-        <span>30</span>
-        <span>50+</span>
-      </span>
-      <span className="gs-unit">km/h</span>
+      <div className="gs-row">
+        <span className="gs-bar" style={{ background: `linear-gradient(90deg, ${wind})` }} />
+        <span className="gs-ticks">
+          <span>0</span>
+          <span>15</span>
+          <span>30</span>
+          <span>50+</span>
+        </span>
+        <span className="gs-unit">km/h</span>
+      </div>
+      <div className="gs-row">
+        <span className="gs-bar" style={{ background: `linear-gradient(90deg, ${lift})` }} />
+        <span className="gs-ticks">
+          <span>0.5</span>
+          <span>1</span>
+          <span>2</span>
+          <span>3</span>
+          <span>6</span>
+        </span>
+        <span className="gs-unit">m/s</span>
+      </div>
     </div>
   );
 }

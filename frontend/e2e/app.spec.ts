@@ -67,6 +67,8 @@ test("the getting-started guide explains models, coverage and quota", async ({ p
   await expect(page.locator(".gram-demo rect").first()).toBeVisible();
   await expect(page.locator(".gram-legend")).toContainText("gust");
   await expect(page.locator(".gram-scale")).toContainText("km/h");
+  await expect(page.locator(".gram-scale")).toContainText("m/s");
+  await expect(page.locator(".guide")).toContainText("violet");
   await expect(page.locator(".guide h3", { hasText: "The sounding, layer by layer" })).toBeVisible();
   await expect(page.locator(".guide")).toContainText("9.8 °C per kilometer");
   await expect(page.locator(".guide")).toContainText("left of that line");
@@ -349,19 +351,16 @@ test("on a phone the header stacks, left-aligns and never overflows", async ({ p
   await expect(page.locator(".board-card").first()).toBeVisible();
   await assertLeftHeader();
 
-  // the page tabs wrap onto rows instead of scrolling out of the viewport
+  // The tabs wrap instead of scrolling out of the viewport. With Source Sans
+  // they fit on one row at 390 px, so the lock is the wrap mode plus no scroll,
+  // not a forced second row.
   const nav = await page.locator(".page-nav").evaluate((el) => ({
-    rows: new Set(
-      [...el.querySelectorAll("button")].map(
-        (b) => Math.round(b.getBoundingClientRect().y),
-      ),
-    ).size,
+    wrap: getComputedStyle(el).flexWrap,
     scroll: el.scrollWidth,
+    client: el.clientWidth,
   }));
-  expect(nav.scroll).toBeLessThanOrEqual(
-    (await page.locator(".page-nav").evaluate((el) => el.clientWidth)) + 1,
-  );
-  expect(nav.rows).toBeGreaterThanOrEqual(2);
+  expect(nav.wrap).toBe("wrap");
+  expect(nav.scroll).toBeLessThanOrEqual(nav.client + 1);
 });
 
 test("reloading reads the localStorage cache without calling Open-Meteo", async ({ page }) => {
@@ -429,6 +428,18 @@ test("0 °C isotherm sits between the sub-zero and above-zero cells", async ({ p
   const coldRow = page.locator('.wg tbody tr:has(th:text-is("2500"))');
   await expect(warmRow.locator("td.cell").first()).toHaveClass(/iso0/);
   await expect(coldRow.locator("td.cell").first()).not.toHaveClass(/iso0/);
+});
+
+test("windgram tooltip shows the thermal updraft at midday and not at night", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  const row = page.locator('.wg tbody tr:has(th:text-is("2000"))');
+  await expect(row).toBeVisible();
+  // 13:00 is the 7th column (hours start at 07:00); 21:00 is the 15th
+  await row.locator("td").nth(6).hover();
+  await expect(page.locator(".wg-cursor-tip")).toContainText("m/s");
+  await row.locator("td").nth(14).hover();
+  await expect(page.locator(".wg-cursor-tip")).not.toContainText("m/s");
 });
 
 test("layout stays put while loading and after picking a place", async ({ page }) => {
@@ -672,6 +683,9 @@ test("map picking and Escape to close", async ({ page }) => {
 
 test("opening the Compare page pins the current place", async ({ page }) => {
   const om = await mockOpenMeteo(page);
+  // An unnamed point stays as coordinates. A live reverse-geocode would
+  // replace that label and make the assertion depend on the network.
+  await mockPhotonDown(page);
   await page.goto("/?lat=45.945&lon=6.71");
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
 

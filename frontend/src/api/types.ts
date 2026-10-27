@@ -22,6 +22,13 @@ export type Surface = {
   cloudHigh: number | null;
   cloudBaseM: number | null;
   psfc: number | null;
+  /** Sensible heat flux into the atmosphere (W/m²). Null when unpublished.
+   * Negative means the model says the surface layer is stable. */
+  sensibleUp: number | null;
+  /** Latent heat flux into the atmosphere (W/m²). Null when unpublished. */
+  latentUp: number | null;
+  /** Downward shortwave radiation at the surface (W/m²). */
+  shortwave: number | null;
 };
 
 export type Hour = {

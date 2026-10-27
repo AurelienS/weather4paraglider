@@ -1,4 +1,7 @@
 import type { Hour, ProfilePoint } from "../api/types";
+import { liftingCondensationLevelM, thermalSpeed } from "./convection";
+
+export { convectiveTop } from "./convection";
 
 export const ALT_STEP_M = 250;
 
@@ -18,12 +21,28 @@ export type GramCell = {
 
 export type RGB = [number, number, number];
 
-const THERMAL_STOPS: [number, RGB][] = [
-  [0.3, [252, 244, 214]],
-  [1.0, [247, 226, 168]],
-  [2.0, [242, 204, 140]],
-  [3.2, [236, 176, 122]],
-  [5.0, [230, 150, 112]],
+/**
+ * Dry-updraft tint, before the wing's sink (about 1.1 m/s on a normal
+ * paraglider). The steps are what that sink turns the number into:
+ *   0.5  green    slower than the sink, most wings descend
+ *   1.0  green    scratchy, a light climb at best
+ *   1.5  lime     a patient climb
+ *   2.0  yellow   a good climb, about 1 m/s on the vario
+ *   2.5  orange   strong
+ *   3.5  red      very strong
+ *   4.5  magenta  rough
+ *   6    violet   extreme; the average rarely gets here
+ * Each color stays light so the dark speed number keeps its contrast.
+ */
+export const THERMAL_STOPS: readonly [number, RGB][] = [
+  [0.5, [177, 217, 171]],
+  [1.0, [131, 208, 128]],
+  [1.5, [173, 210, 86]],
+  [2.0, [240, 197, 56]],
+  [2.5, [242, 142, 54]],
+  [3.5, [228, 98, 88]],
+  [4.5, [213, 123, 171]],
+  [6.0, [180, 139, 208]],
 ];
 
 const WIND_STOPS: [number, RGB][] = [
@@ -67,10 +86,6 @@ export function iso0CellZ(
   return groundT != null && groundT <= 0 ? elevM : null;
 }
 
-const DALR = 9.8;
-/** Modified Holzworth / NWP: theta_v,env = theta_v,ground + 0.5 K (AMT 2022, Coniglio 2013). */
-const LID_K = 0.5;
-
 export function sampleCell(
   hour: Hour,
   z: number,
@@ -107,59 +122,8 @@ export function sampleCell(
     td: round1(interpScalar(profile, z, (p) => p.td)),
     rh: round0(interpScalar(profile, z, (p) => p.rh)),
     cloud: cloudAt(z, elevM, hour, profile, cblTop),
-    wMs: thermalSpeed(hour, z, elevM, t, cblTop),
+    wMs: thermalSpeed(hour, z, elevM, cblTop),
   };
-}
-
-/**
- * Modified Holzworth: dry parcel from ground Tv (gamma_d 9.8 K/km) up to
- * theta_v,env = theta_v,ground + 0.5 K. Operational CBL standard; DrJack
- * (soaring) puts the glider ceiling slightly below this level.
- */
-export function convectiveTop(hour: Hour, elevM: number): number | null {
-  const profile = [...hour.profile].sort((a, b) => a.z - b.z);
-  const tSol = hour.surface.t2m ?? profile[0]?.t ?? null;
-  const tdSol = profile[0]?.td ?? null;
-  const zSol = profile[0]?.z ?? elevM;
-  const pSfc = hour.surface.psfc ?? 1013;
-  if (tSol == null) return null;
-  const thetaP = virtualTheta(tSol, tdSol, zSol, zSol, pSfc);
-  const zHi = profile[profile.length - 1]?.z ?? elevM;
-  let lastIn = elevM;
-  let seenUnstable = false;
-  for (let z = elevM; z <= zHi; z += 50) {
-    const tEnv = interpScalar(profile, z, (p) => p.t);
-    if (tEnv == null) continue;
-    const tdEnv = interpScalar(profile, z, (p) => p.td);
-    const thetaE = virtualTheta(tEnv, tdEnv, z, zSol, pSfc);
-    if (thetaE > thetaP + LID_K) {
-      return seenUnstable ? lastIn : null;
-    }
-    seenUnstable = true;
-    lastIn = z;
-  }
-  return seenUnstable ? lastIn : null;
-}
-
-function satVaporHpa(tC: number): number {
-  return 6.112 * Math.exp((17.67 * tC) / (tC + 243.5));
-}
-
-function virtualTheta(
-  tC: number,
-  tdC: number | null,
-  z: number,
-  zSol: number,
-  pSfcHpa: number,
-): number {
-  let tv = tC;
-  if (tdC != null) {
-    const p = pSfcHpa * Math.exp(-(z - zSol) / 8500);
-    const e = satVaporHpa(tdC);
-    const q = (0.622 * e) / Math.max(p - e, 1);
-    tv = (tC + 273.15) * (1 + 0.608 * q) - 273.15;
-  }
-  return tv + (DALR * (z - zSol)) / 1000;
 }
 
 export function windRgb(kmh: number): RGB {
@@ -167,7 +131,7 @@ export function windRgb(kmh: number): RGB {
 }
 
 export function thermalRgb(wMs: number): RGB {
-  return rampRgb(THERMAL_STOPS, wMs, [252, 244, 214]);
+  return rampRgb(THERMAL_STOPS, wMs, [177, 217, 171]);
 }
 
 export function cellBackground(wMs: number, cloud: number | null): RGB {
@@ -215,16 +179,14 @@ function cloudAt(
   return round0(interpScalar(profile, z, (p) => p.cloud));
 }
 
-/** LCL AMSL: cloudBaseM, else ~125 m/K x (T-Td). */
+/** LCL AMSL: the model's cloud base, else Bolton's lifting condensation level. */
 function condensationLevelM(hour: Hour, elevM: number): number | null {
   if (hour.surface.cloudBaseM != null) return hour.surface.cloudBaseM;
   const t = hour.surface.t2m ?? hour.profile[0]?.t ?? null;
   const td = hour.profile[0]?.td ?? null;
   const zSol = hour.profile[0]?.z ?? elevM;
   if (t == null || td == null) return null;
-  const spread = t - td;
-  if (spread <= 0.3) return zSol;
-  return zSol + 125 * spread;
+  return liftingCondensationLevelM(t, td, zSol);
 }
 
 function lowCloudFade(z: number, elevM: number, cloudLow: number | null): number | null {
@@ -233,30 +195,7 @@ function lowCloudFade(z: number, elevM: number, cloudLow: number | null): number
   return round0(cloudLow * Math.exp(-agl / 700));
 }
 
-/**
- * Estimated w (m/s) in the CBL: 1.15 sqrt(dT + 0.4) x (h / 800)^0.25
- * dT = dry-parcel T - env T. Not a model field.
- */
-function thermalSpeed(
-  hour: Hour,
-  z: number,
-  elevM: number,
-  tEnv: number | null,
-  cblTop: number | null,
-): number {
-  if (cblTop == null || z > cblTop + 40) return 0;
-  const tSol = hour.surface.t2m ?? hour.profile[0]?.t ?? null;
-  const zSol = hour.profile[0]?.z ?? elevM;
-  const tUse = tEnv ?? (z <= elevM + 40 ? tSol : null);
-  if (tSol == null || tUse == null) return 0;
-  const tParcel = tSol - (DALR * (z - zSol)) / 1000;
-  const dt = Math.max(0, tParcel - tUse);
-  const h = Math.max(100, cblTop - zSol);
-  const w = 1.15 * Math.sqrt(dt + 0.4) * (h / 800) ** 0.25;
-  return Math.round(w * 10) / 10;
-}
-
-function rampRgb(stops: [number, RGB][], x: number, fallback: RGB): RGB {
+function rampRgb(stops: readonly [number, RGB][], x: number, fallback: RGB): RGB {
   const first = stops[0];
   const last = stops[stops.length - 1];
   if (!first || !last) return fallback;

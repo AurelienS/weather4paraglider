@@ -312,11 +312,10 @@ function buildLayout(hour: Hour, elevationM: number) {
 
   const t0 = profile[0]?.t;
   const z0 = profile[0]?.z ?? zRef;
-  // the vertical reference follows the surface parcel — the 2 m temperature
-  // placed at the first profile level — so "left of the line = unstable"
-  // matches the convective layer shaded in the windgram (convectiveTop uses
-  // the same reference). Using the cooler 20 m level instead would push the
-  // line left and make the convective layer look stable.
+  // Dry adiabat of the surface air (the 2 m temperature, placed at the first
+  // profile level). "Left of the line" stays that dry-parcel check. The
+  // windgram tint uses the mixed-layer virtual parcel, so a superadiabatic
+  // skin can leave this line a little to the right of the tinted top.
   const tSurface = hour.surface.t2m ?? t0;
   const thCenter = tSurface != null ? thetaOf(tSurface, z0, zRef) : 15;
   const tThetas = profile

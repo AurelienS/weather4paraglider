@@ -99,6 +99,9 @@ function averageSurface(surfaces: Surface[]): Surface {
     cloudHigh: ri(meanOf(surfaces.map((s) => s.cloudHigh))),
     cloudBaseM: ri(meanOf(surfaces.map((s) => s.cloudBaseM))),
     psfc: r1(meanOf(surfaces.map((s) => s.psfc))),
+    sensibleUp: r1(meanOf(surfaces.map((s) => s.sensibleUp))),
+    latentUp: r1(meanOf(surfaces.map((s) => s.latentUp))),
+    shortwave: r1(meanOf(surfaces.map((s) => s.shortwave))),
   };
 }
 

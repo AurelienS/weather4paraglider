@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { iso0CellZ } from "./windgram";
+import { iso0CellZ, thermalRgb } from "./windgram";
 
 const LEVELS = [3000, 2750, 2500, 2250, 2000];
 
@@ -37,6 +37,17 @@ describe("iso0CellZ", () => {
   it("skips rows without temperature data", () => {
     const z = iso0CellZ(LEVELS, [-5, null, 0.4, 3, 6], 12, 1500);
     expect(z).toBe(2750);
+  });
+
+  it("colors a weak climb green and a rough one violet", () => {
+    const weak = thermalRgb(0.5);
+    const good = thermalRgb(2);
+    const rough = thermalRgb(6);
+    expect(weak[1]).toBeGreaterThan(weak[0]);
+    expect(weak[1]).toBeGreaterThan(weak[2]);
+    expect(good[0]).toBeGreaterThan(good[2] + 80);
+    expect(rough[2]).toBeGreaterThan(rough[1]);
+    expect(thermalRgb(9)).toEqual(rough);
   });
 
   it("handles an empty grid", () => {

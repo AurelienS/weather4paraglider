@@ -26,6 +26,9 @@ function hour(time: string): Hour {
       cloudHigh: 0,
       cloudBaseM: 1500,
       psfc: 1013,
+      sensibleUp: null,
+      latentUp: null,
+      shortwave: null,
     },
     profile: [],
   };

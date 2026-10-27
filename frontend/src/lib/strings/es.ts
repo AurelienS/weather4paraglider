@@ -79,6 +79,7 @@ export const es: Dict = {
   tSoil: "T suelo",
   tMissing: "T —",
   tipNeb: "nub {n}%",
+  tipLift: "ascenso {n} m/s",
   outOfForecast: "fuera de previsión",
   surfaceAria: "Superficie",
   statT2m: "T 2 m",
@@ -185,15 +186,18 @@ export const es: Dict = {
     "pequeño rojo ladrillo bajo la velocidad es la racha, mostrada solo cuando " +
     "añade 5 km/h o más.",
   guideGramP2:
-    "El fondo de la celda habla del lift: cuanto más cálido brilla, más térmicas " +
-    "espera el modelo allí, y un velo gris señala las nubes. Pasa el ratón por " +
-    "una celda para leer la temperatura exacta y la cobertura nubosa a esa " +
-    "altitud, y sigue la línea azul a través de la rejilla — la isoterma de " +
-    "0 °C — para rastrear el nivel de congelación.",
+    "El fondo de la celda es la térmica, en una escala de parapente: verde, una " +
+    "ascendencia floja; amarillo, un buen día; rojo, una fuerte; violeta, un día " +
+    "duro. Un velo gris señala las nubes. Pasa el ratón por " +
+    "una celda para leer la temperatura, el ascenso en m/s y la cobertura nubosa. " +
+    "Esa velocidad es la subida media de una térmica seca, antes del hundimiento " +
+    "del ala — un cúmulo encima puede añadir más, y un viento que arrecia con la " +
+    "altura puede romper la térmica. Sigue la línea azul a través de la rejilla — " +
+    "la isoterma de 0 °C — para rastrear el nivel de congelación.",
     demoSpeed: "velocidad del viento, km/h",
   demoGust: "racha (solo cuando añade 5 km/h o más)",
   demoArrow: "hacia dónde va el aire",
-  demoHover: "hover: temperatura, nubosidad",
+  demoHover: "hover: temperatura, ascenso, nubosidad",
   demoIso0: "isoterma de 0 °C",
   demoScale: "km/h",
   guideSoundTitle: "El sondeo, capa por capa",
@@ -205,9 +209,11 @@ export const es: Dict = {
   guideSoundP2:
     "Donde la curva naranja queda a la izquierda de esa línea, el aire circundante " +
     "está más frío que una parcela que asciende: es inestable, las térmicas suben. " +
-    "Donde la curva queda a la derecha, el aire frena el ascenso: es estable. En esencia, es la capa que el windgram tiñe de convectiva — el windgram puede " +
-    "llevarla algo más arriba, porque el aire húmedo en superficie mantiene las " +
-    "térmicas vivas más tiempo que un cálculo de parcela seca.",
+    "Donde la curva queda a la derecha, el aire frena el ascenso: es estable. En " +
+    "esencia, es la capa que el windgram tiñe de convectiva. El tinte sigue la capa " +
+    "de mezcla: el aire más caliente pegado al suelo no la sube por sí solo, mientras " +
+    "que el aire húmedo en superficie puede llevarla un poco más arriba que esta " +
+    "línea seca.",
   guideSoundP3:
     "Donde las curvas naranja y azul se juntan, el aire está casi saturado: esa es " +
     "la base de las nubes. Pasa el ratón por el gráfico para leer la temperatura y " +

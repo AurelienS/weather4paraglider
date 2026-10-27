@@ -8,7 +8,7 @@ export function WindArrow({ dir, speed, color }: Props) {
   if (speed < 1.5) {
     return (
       <svg className="warrow" viewBox="0 0 32 32" aria-hidden>
-        <circle cx="16" cy="16" r="3.4" fill={color} />
+        <circle cx="16" cy="16" r="3.4" fill={color} stroke="#241c14" strokeWidth="1.1" />
       </svg>
     );
   }
@@ -22,11 +22,26 @@ export function WindArrow({ dir, speed, color }: Props) {
           y1="28"
           x2="16"
           y2="9"
+          stroke="#241c14"
+          strokeWidth={w + 2.2}
+          strokeLinecap="round"
+        />
+        <line
+          x1="16"
+          y1="28"
+          x2="16"
+          y2="9"
           stroke={color}
           strokeWidth={w}
           strokeLinecap="round"
         />
-        <polygon points="16,3 7.5,15 24.5,15" fill={color} />
+        <polygon
+          points="16,3 7.5,15 24.5,15"
+          fill={color}
+          stroke="#241c14"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
       </g>
     </svg>
   );

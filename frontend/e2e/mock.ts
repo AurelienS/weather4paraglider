@@ -28,10 +28,34 @@ function stamp(dayOffset: number, hour: number, minute = 0): string {
   return `${iso}T${pad(hour)}:${pad(minute)}`;
 }
 
-function valueFor(v: string, hour: number): number {
-  const t2 = 9 + 6 * Math.sin(((hour - 9) / 24) * Math.PI * 2);
-  if (v === "temperature_2m") return Math.round(t2 * 10) / 10;
-  if (v === "dew_point_2m") return Math.round((t2 - 3) * 10) / 10;
+/** 0 at night, a sine from 07:00 to 18:00. Morning stays stable (x < 0.15). */
+function sunFactor(hour: number): number {
+  if (hour < 7 || hour > 18) return 0;
+  return Math.sin(((hour - 7) / 11) * Math.PI);
+}
+
+/**
+ * One temperature profile for every level. Before late morning the lapse is
+ * the standard 6.5 K/km, so the 07:00 freezing level stays between 2250 and
+ * 2500 m at the default elevation. Later, a mixed layer grows under a cap.
+ */
+function airTemp(z: number, hour: number, elev: number): number {
+  const x = sunFactor(hour);
+  const agl = z - elev;
+  const tSfc = 4 + 14 * x;
+  if (x < 0.15) return tSfc - 0.0065 * agl;
+  const zi = 400 + 1100 * x;
+  if (agl <= zi) return tSfc - 0.0098 * agl;
+  return tSfc - 0.0098 * zi + 3.5 - 0.0065 * (agl - zi);
+}
+
+function valueFor(v: string, hour: number, elev: number): number | null {
+  if (v === "sensible_heat_flux" || v === "latent_heat_flux") return null;
+  if (v === "shortwave_radiation") {
+    return hour < 7 || hour > 18 ? 0 : Math.round(700 * sunFactor(hour));
+  }
+  if (v === "temperature_2m") return Math.round(airTemp(elev + 2, hour, elev) * 10) / 10;
+  if (v === "dew_point_2m") return Math.round((airTemp(elev + 2, hour, elev) - 6) * 10) / 10;
   if (v === "relative_humidity_2m") return 65;
   if (v === "wind_speed_10m") return 8 + (hour % 5);
   if (v === "wind_direction_10m") return 225;
@@ -43,12 +67,12 @@ function valueFor(v: string, hour: number): number {
   if (v === "cloud_cover_high") return 35;
   if (v === "surface_pressure") return 1013;
   const agl = /^temperature_(\d+)m$/.exec(v);
-  if (agl) return Math.round((t2 - Number(agl[1]) * 0.0065) * 10) / 10;
+  if (agl) return Math.round(airTemp(elev + Number(agl[1]), hour, elev) * 10) / 10;
   const wgl = /^wind_speed_(\d+)m$/.exec(v);
   if (wgl) return Math.round((8 + Number(wgl[1]) * 0.12) * 10) / 10;
   if (/^wind_direction_\d+m$/.test(v)) return 230;
   const pr = /^temperature_(\d+)hPa$/.exec(v);
-  if (pr) return Math.round((15 - (GEO_HEIGHTS[pr[1]] ?? 0) * 0.0065) * 10) / 10;
+  if (pr) return Math.round(airTemp(GEO_HEIGHTS[pr[1]] ?? elev, hour, elev) * 10) / 10;
   if (/^dew_point_\d+hPa$/.test(v)) return -3;
   if (/^relative_humidity_\d+hPa$/.test(v)) return 55;
   if (/^cloud_cover_\d+hPa$/.test(v)) return 60;
@@ -73,14 +97,14 @@ function buildPayload(q: URLSearchParams, elev: number, nullsAfter = Infinity): 
     const minutely: Record<string, Array<number | string | null>> = { time };
     for (const v of m15) {
       minutely[v] = time.map((_, i) =>
-        i >= nullsAfter * 4 ? null : valueFor(v, Math.floor(i / 4) % 24),
+        i >= nullsAfter * 4 ? null : valueFor(v, Math.floor(i / 4) % 24, elev),
       );
     }
     const hourly: Record<string, Array<number | string | null>> = {
       time: time.filter((t) => t.endsWith(":00")),
     };
     for (const v of hourlyVars) {
-      hourly[v] = hourly.time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24)));
+      hourly[v] = hourly.time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24, elev)));
     }
     return {
       latitude: 45.95,
@@ -96,7 +120,7 @@ function buildPayload(q: URLSearchParams, elev: number, nullsAfter = Infinity): 
   for (let i = 0; i < hours; i++) time.push(stamp(Math.floor(i / 24), i % 24));
   const hourly: Record<string, Array<number | string | null>> = { time };
   for (const v of hourlyVars.length > 0 ? hourlyVars : allHourlyVars()) {
-    hourly[v] = time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24)));
+    hourly[v] = time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24, elev)));
   }
   return {
     latitude: 45.95,

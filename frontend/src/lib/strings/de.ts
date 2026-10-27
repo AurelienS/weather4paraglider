@@ -79,6 +79,7 @@ export const de: Dict = {
   tSoil: "T Boden",
   tMissing: "T —",
   tipNeb: "Bewölkung {n}%",
+  tipLift: "Steigen {n} m/s",
   outOfForecast: "außerhalb der Vorhersage",
   surfaceAria: "Boden",
   statT2m: "T 2 m",
@@ -189,15 +190,18 @@ export const de: Dict = {
     "ziegelrote Zahl unter der Geschwindigkeit ist die Bö, angezeigt nur wenn sie " +
     "5 km/h oder mehr hinzufügt.",
   guideGramP2:
-    "Der Zellhintergrund erzählt vom Aufwind: je wärmer er leuchtet, desto mehr " +
-    "Thermik erwartet das Modell dort, und ein grauer Schleier bedeutet Wolken. " +
-    "Fahre über eine Zelle, um die exakte Temperatur und Bewölkung in dieser Höhe " +
-    "zu lesen, und folge der blauen Linie über dem Raster — der 0-°C-Isotherme — " +
-    "um die Frostgrenze zu verfolgen.",
+    "Der Zellhintergrund ist die Thermik, auf einer Gleitschirm-Skala: Grün ist " +
+    "ein schwaches Steigen, Gelb ein gutes, Rot ein starkes und Violett ein rauer " +
+    "Tag. Ein grauer Schleier bedeutet Wolken. Fahre über eine " +
+    "Zelle, um Temperatur, Steigen in m/s und Bewölkung zu lesen. Diese Geschwindigkeit " +
+    "ist der mittlere Steigwert eines trockenen Thermals, vor dem Eigensinken des " +
+    "Schirms — eine Wolke darüber kann mehr bringen, und ein Wind, der mit der Höhe " +
+    "stark zunimmt, kann den Thermal zerreißen. Folge der blauen Linie über dem Raster " +
+    "— der 0-°C-Isotherme — um die Frostgrenze zu verfolgen.",
     demoSpeed: "Windgeschwindigkeit, km/h",
   demoGust: "Bö (nur wenn sie 5 km/h oder mehr hinzufügt)",
   demoArrow: "Strömungsrichtung",
-  demoHover: "Hover: Temperatur, Bewölkung",
+  demoHover: "Hover: Temperatur, Steigen, Bewölkung",
   demoIso0: "0-°C-Isotherme",
   demoScale: "km/h",
   guideSoundTitle: "Das Sounding, Schicht für Schicht",
@@ -209,9 +213,10 @@ export const de: Dict = {
   guideSoundP2:
     "Links der Linie ist die Umgebungsluft kälter als ein aufsteigendes Paket: " +
     "instabil, Thermik steigt. Rechts der Linie bremst die Luft den Aufstieg: " +
-    "stabil. Im Wesentlichen ist es die Schicht, die das Windgram als konvektiv färbt — das " +
-    "Windgram kann sie etwas höher ziehen, denn feuchte Bodenluft hält die Thermik " +
-    "länger am Leben als eine trockene Paketrechnung.",
+    "stabil. Im Wesentlichen ist es die Schicht, die das Windgram als konvektiv " +
+    "färbt. Die Färbung folgt der Mischungsschicht: die heißeste Luft direkt am " +
+    "Boden hebt sie nicht von allein, feuchte Bodenluft kann sie dagegen etwas " +
+    "höher tragen als diese trockene Linie.",
   guideSoundP3:
     "Wo sich die orange und die blaue Kurve nähern, ist die Luft fast gesättigt: " +
     "das ist die Wolkenbasis. Fahr über das Diagramm, um Temperatur und Taupunkt " +

@@ -397,9 +397,15 @@ select optgroup {
 
 .gram-scale {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.gs-row {
+  display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
 }
 
 .gs-bar {

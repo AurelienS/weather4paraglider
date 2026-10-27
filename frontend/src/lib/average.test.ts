@@ -10,6 +10,7 @@ function hour(
   dir: number | null,
   z: number[] = [1000, 2000],
   t: number[] = [10, 0],
+  surface: Partial<Hour["surface"]> = {},
 ): Hour {
   return {
     time,
@@ -26,6 +27,10 @@ function hour(
       cloudHigh: 30,
       cloudBaseM: 2000,
       psfc: 850,
+      sensibleUp: null,
+      latentUp: null,
+      shortwave: 0,
+      ...surface,
     },
     profile: z.map((alt, i) => ({
       z: alt,
@@ -97,23 +102,51 @@ describe("averageHours", () => {
   });
 
   test("resamples profiles on a common 100 m grid", () => {
+    const sun = { shortwave: 600, sensibleUp: null as number | null, latentUp: 40 };
     const avgs = averageHours([
-      // z: [1000, 2000], t: [10, 0] → 5 at 1500 m
-      [hour("2026-08-31T10:00:00+02:00", 10, 10, 0, [1000, 2000], [10, 0])],
-      // z: [1000, 2000], t: [12, 2] → 7 at 1500 m
-      [hour("2026-08-31T10:00:00+02:00", 12, 10, 0, [1000, 2000], [12, 2])],
+      // dry adiabat 20 → 10.2, then a cap at 2500. Midpoint 15.1 °C.
+      [
+        hour(
+          "2026-08-31T10:00:00+02:00",
+          20,
+          10,
+          0,
+          [1000, 2000, 2500],
+          [20, 10.2, 16],
+          sun,
+        ),
+      ],
+      // same shape, 2 °C warmer. Midpoint 17.1 °C. Null flux is skipped.
+      [
+        hour(
+          "2026-08-31T10:00:00+02:00",
+          22,
+          10,
+          0,
+          [1000, 2000, 2500],
+          [22, 12.2, 18],
+          { shortwave: 600, sensibleUp: 120, latentUp: 20 },
+        ),
+      ],
     ]);
     const z1500 = avgs[0]?.profile.find((p) => p.z === 1500);
-    // mean of the two interpolated profiles: (5+7)/2
-    expect(z1500?.t).toBeCloseTo(6, 6);
+    // mean of the two interpolated profiles: (15.1+17.1)/2
+    expect(z1500?.t).toBeCloseTo(16.1, 5);
     expect(z1500?.src).toBe("avg");
+    expect(avgs[0]?.surface.t2m).toBe(21);
+    expect(avgs[0]?.surface.shortwave).toBe(600);
+    // null sensible flux on one model: the other model's value stands
+    expect(avgs[0]?.surface.sensibleUp).toBe(120);
+    expect(avgs[0]?.surface.latentUp).toBe(30);
     // the grid starts at the models' lowest level (rounded up): no dead
     // null zone below the terrain, so profile[0] has a real surface Td
     expect(avgs[0]?.profile[0]?.z).toBe(1000);
     expect(avgs[0]?.profile[0]?.td).not.toBeNull();
-    // the convective shading (yellow thermal band in the windgram) depends
-    // on convectiveTop finding that anchor — it must survive resampling
-    expect(convectiveTop(avgs[0]!, 1000)).not.toBeNull();
+    // the convective shading depends on convectiveTop finding that mixed
+    // layer and its cap after resampling
+    const top = convectiveTop(avgs[0]!, 1000);
+    expect(top).toBeGreaterThan(1800);
+    expect(top).toBeLessThan(2500);
   });
 });
 

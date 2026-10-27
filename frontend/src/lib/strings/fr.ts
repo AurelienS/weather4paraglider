@@ -79,6 +79,7 @@ export const fr: Dict = {
   tSoil: "T sol",
   tMissing: "T —",
   tipNeb: "neb {n}%",
+  tipLift: "ascendance {n} m/s",
   outOfForecast: "hors prévision",
   surfaceAria: "Surface",
   statT2m: "T 2 m",
@@ -188,15 +189,18 @@ export const fr: Dict = {
     "la vitesse, du vert pâle au rouge d'alerte. Le petit chiffre rouge brique " +
     "sous la vitesse est la rafale, affichée seulement si elle ajoute 5 km/h ou plus.",
   guideGramP2:
-    "Le fond de la case parle du lift : plus il est chaud, plus le modèle attend " +
-    "de thermiques à cette altitude, et un voile gris signale les nuages. " +
-    "Survolez une case pour lire la température exacte et la couverture nuageuse " +
-    "à cette altitude, et repérez la ligne bleue en travers de la grille — " +
+    "Le fond de la case est le thermique, sur une échelle de parapente : vert, " +
+    "une ascendance faible ; jaune, une bonne ; rouge, une forte ; violet, une " +
+    "journée musclée. Un voile gris signale les nuages. Survolez une case pour lire " +
+    "la température, l'ascendance en m/s et la couverture nuageuse. Cette vitesse est " +
+    "la montée moyenne d'un thermique sec, avant le taux de chute de l'aile — un " +
+    "cumulus au-dessus peut en ajouter, et un vent qui forcit avec l'altitude peut " +
+    "déchirer le thermique. Repérez la ligne bleue en travers de la grille — " +
     "l'isotherme 0 °C — pour suivre le niveau de gel.",
     demoSpeed: "vitesse du vent, km/h",
   demoGust: "rafale (affichée si elle ajoute 5 km/h ou plus)",
   demoArrow: "direction où va l'air",
-  demoHover: "survol : température, couverture nuageuse",
+  demoHover: "survol : température, ascendance, couverture nuageuse",
   demoIso0: "isotherme 0 °C",
   demoScale: "km/h",
   guideSoundTitle: "Le sounding, couche par couche",
@@ -208,9 +212,11 @@ export const fr: Dict = {
   guideSoundP2:
     "Là où la courbe orange est à gauche de cette ligne, l'air ambiant est plus " +
     "froid qu'une parcelle qui monte : c'est instable, les thermiques montent. " +
-    "Là où la courbe est à droite, l'air freine l'ascension : c'est stable. C'est pour l'essentiel la couche que le windgram teinte en convectif — le " +
-    "windgram peut la porter un peu plus haut, car l'air humide en surface " +
-    "maintient les thermiques plus longtemps qu'un calcul de parcelle sèche.",
+    "Là où la courbe est à droite, l'air freine l'ascension : c'est stable. " +
+    "C'est pour l'essentiel la couche que le windgram teinte en convectif. La teinte " +
+    "suit la couche mélangée : l'air très chaud collé au sol ne la relève pas à lui " +
+    "seul, tandis que l'air humide en surface peut la porter un peu plus haut que " +
+    "cette ligne sèche.",
   guideSoundP3:
     "Là où les courbes orange et bleue se rapprochent, l'air est presque saturé : " +
     "c'est la base des nuages. Survolez le graphique pour lire la température et " +

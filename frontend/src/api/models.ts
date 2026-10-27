@@ -270,6 +270,9 @@ export function apiVarsFor(model: ModelDef): string[] {
     "cloud_cover_mid",
     "cloud_cover_high",
     "surface_pressure",
+    "shortwave_radiation",
+    "sensible_heat_flux",
+    "latent_heat_flux",
   ];
   for (const h of model.aglHeights) {
     vars.push(`temperature_${h}m`, `wind_speed_${h}m`, `wind_direction_${h}m`);

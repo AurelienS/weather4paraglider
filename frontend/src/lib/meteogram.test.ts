@@ -34,6 +34,9 @@ function hour(
       cloudHigh: 30,
       cloudBaseM: 2500,
       psfc: 850,
+      sensibleUp: null,
+      latentUp: null,
+      shortwave: 0,
       ...surface,
     },
     profile: profile.map((p) => ({
@@ -130,20 +133,26 @@ describe("cloudDecks", () => {
 
 describe("cblSeries", () => {
   test("keeps only the hours where the convective layer exists", () => {
-    // unstable: surface 14° vs 5° at 2500 m → convection up to ~2500
-    const unstable = hour("2026-08-31T14:00:00+02:00", {}, [
-      { z: 1000, t: 14, td: 8 },
-      { z: 2500, t: 5, td: 0 },
+    // mixed to 1800 m (dry adiabat from 20 °C), then a cap
+    const unstable = hour("2026-08-31T14:00:00+02:00", { t2m: 20, shortwave: 500 }, [
+      { z: 1000, t: 20, td: 5 },
+      { z: 1400, t: 16.1, td: 5 },
+      { z: 1800, t: 12.2, td: 5 },
+      { z: 2100, t: 16, td: 0 },
+      { z: 2600, t: 12, td: -2 },
     ]);
-    // stable: warmer aloft than the dry parcel from the ground
-    const stable = hour("2026-08-31T20:00:00+02:00", { t2m: 4 }, [
-      { z: 1000, t: 12, td: 2 },
-      { z: 2500, t: 11, td: 0 },
+    // night: surface inversion, no sun
+    const stable = hour("2026-08-31T20:00:00+02:00", { t2m: 4, shortwave: 0 }, [
+      { z: 1000, t: 4, td: 0 },
+      { z: 1150, t: 10, td: 0 },
+      { z: 1800, t: 8, td: 0 },
+      { z: 2600, t: 4, td: -2 },
     ]);
     const series = cblSeries([unstable, stable], 1000);
     expect(series).toHaveLength(1);
     expect(series[0]?.hour).toBe(14);
-    expect(series[0]?.zM).toBeGreaterThan(1000);
+    expect(series[0]?.zM).toBeGreaterThan(1700);
+    expect(series[0]?.zM).toBeLessThan(2100);
   });
 
   test("surfaceTd reads the lowest profile level", () => {
