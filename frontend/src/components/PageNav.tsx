@@ -1,7 +1,7 @@
 import { useI18n } from "../i18nContext";
 
-/** The pages of the app; the compare board has two exclusive flavors. */
-export type Page = "place" | "compare-places" | "compare-models" | "guide";
+/** The pages of the app. Place is the desk; the guide is the only other page. */
+export type Page = "place" | "guide";
 
 type Props = {
   page: Page;
@@ -13,8 +13,6 @@ export function PageNav({ page, onNavigate }: Props) {
   const { t } = useI18n();
   const tabs: { id: Page; label: string }[] = [
     { id: "place", label: t.tabPlace },
-    { id: "compare-places", label: t.compareCheck },
-    { id: "compare-models", label: t.compareModels },
     { id: "guide", label: t.tabGuide },
   ];
   return (

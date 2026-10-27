@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { soundingAvailable } from "../api/pipeline";
 import { groupByDay, dayLabel, utcSlot } from "../lib/format";
 import { meteoHoursForDay } from "../lib/meteogram";
@@ -43,7 +43,6 @@ export function PinCard({
   showDown,
 }: Props) {
   const { t, lang } = useI18n();
-  const [activeZ, setActiveZ] = useState<number | null>(null);
   const label = pin.name ?? `${pin.lat.toFixed(4)}, ${pin.lon.toFixed(4)}`;
   const days = useMemo(
     () => (state?.status === "ready" ? groupByDay(state.data.hours, lang) : []),
@@ -116,12 +115,7 @@ export function PinCard({
       ) : hour ? (
         <>
           <SurfaceStats hour={hour} elevationM={data!.modelElevationM} />
-          <Sounding
-            hour={hour}
-            elevationM={data!.modelElevationM}
-            activeZ={activeZ}
-            onActiveZ={setActiveZ}
-          />
+          <Sounding hour={hour} elevationM={data!.modelElevationM} />
         </>
       ) : (
         <p className="board-card-note">{t.noDataDay}</p>

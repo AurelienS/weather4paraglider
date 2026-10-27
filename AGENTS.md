@@ -6,7 +6,7 @@ ICON-D2, DMI HARMONIE) is fetched directly from the browser through the
 public Open-Meteo API (`/v1/meteofrance` and `/v1/forecast`); the point cache
 lives in each user's `localStorage` (3 h slot, 1 h for the 15-min nowcast).
 Models differ in resolution and forecast window (2–5 days, displayed
-07:00–22:00) — the catalog is `MODELS` in `frontend/src/api/models.ts`.
+08:00–21:00) — the catalog is `MODELS` in `frontend/src/api/models.ts`.
 Several models only cover part of Europe: when Open-Meteo has no data for a
 point, the user gets an explicit "no data for this location — pick another
 model" message (no silent point clamping). Deployable as static files
@@ -19,30 +19,22 @@ is a no-op unless configured: build-time env vars `VITE_UMAMI_SRC` +
 `VITE_UMAMI_WEBSITE_ID` (optional `VITE_UMAMI_DOMAINS` to track the prod
 domain only), or a runtime `window.W4P_ANALYTICS` override. Auto-tracking is
 disabled; page views are sent on page changes with stable synthetic paths
-(`/place`, `/compare/places`, `/compare/models`, `/guide`) so pin/model/day
+(`/place`, `/guide`) so pin/model/day
 selections never pollute the Pages report. Custom events via `trackEvent`
 (e.g. `model_selected`). The real values live in `frontend/.env.production`
 (website id is public by design, safe to commit; `VITE_UMAMI_DOMAINS` pins the
 prod host). The e2e build uses `--mode e2e` so it never loads that file. E2E: `mockUmami(page)` serves a same-origin stub,
 never the real network.
 
-## Pages and comparison modes
+## Pages
 
-Three pages share one header skeleton (`PageHeader`): **Place** (single
-place), **Compare places** (`#compare=1`), **Compare models**
-(`#compare=models`). Both compare pages keep their own recent-list
-(`w4p.compare.history.v2`, lib/history.ts). State survives reloads and is
-shareable through the URL: point/model in the query string, compare boards as
-`pins=` entries (`45.9231,6.8692/Name` or `model:arome_france`) handled by
-`src/stores/url.ts` (`parseBootstrap`, `writeStateToUrl`). Boards may be
-empty (placeholders, refresh disabled); a bare `?compare=…` URL without pins
-seeds an empty board. Compare stores are versioned (`COMPARE_VERSION`,
-currently 3, `w4p.compare.store.v3`). The models board can prepend a derived
-**Average card** (`lib/average.ts`, `AverageCard`, toggle persisted with the
-board) averaging ≥2 loaded models — wind speeds are always integers, and the
-averaged profile is resampled on a common 100 m grid starting at the first
-altitude any model actually covers (the convective shading needs a real
-`profile[0]`).
+Two pages share the header: **Place** (the desk) and **Guide** (`?guide=1`).
+The desk is a side column plus the chart. The column offers AROME 2.5 km and
+ICON D2 as two plates, and lists favorites and recent places as one-click
+rows. Search lives there too. An old `?compare=` link opens the place instead
+of a board. State survives reloads and is shareable through the URL
+(point/model in the query string, `src/stores/url.ts`). The sounding steps
+one hour at a time with the arrows beside the chart, including across days.
 
 ## Commands
 

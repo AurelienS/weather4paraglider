@@ -1,30 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  MODELS,
-  isModelId,
-  MODEL_GROUP_ORDER,
-  type ModelGroup,
-} from "./api/models";
-import { BoardHead } from "./components/BoardHead";
-import { CompareBoard } from "./components/CompareBoard";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { soundingAvailable } from "./api/pipeline";
 import { Guide } from "./components/Guide";
 import { Meteogram } from "./components/Meteogram";
 import { PageNav, type Page } from "./components/PageNav";
+import { PlaceRail } from "./components/PlaceRail";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
 import { Windgram } from "./components/Windgram";
+import { useI18n } from "./i18nContext";
+import { trackPageView } from "./lib/analytics";
 import { groupByDay, hourLabel, utcSlot } from "./lib/format";
-import { trackEvent, trackPageView } from "./lib/analytics";
-import { soundingAvailable } from "./api/pipeline";
-import { meteoHoursForDay } from "./lib/meteogram";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
+import { meteoHoursForDay } from "./lib/meteogram";
 import { useIsMobile } from "./lib/useIsMobile";
 import { useStore } from "./stores";
 import { storeCompare, writeStateToUrl } from "./stores/url";
-import { useI18n } from "./i18nContext";
 
-// language names are shown in their own language, whatever the UI language
 const LANG_NAMES: Record<Lang, string> = {
   en: "English",
   fr: "Français",
@@ -32,11 +24,68 @@ const LANG_NAMES: Record<Lang, string> = {
   es: "Español",
 };
 
-// dropdown grouping of the model select, in display order: the all-altitude
-// reference models first, then the ground-precision specialists, the nowcast
-// and finally the longer-range models
-// fixed windgram ceiling: one tall grid, the page scrolls
 const Z_MAX_M = 5000;
+
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d={dir === "left" ? "M14.5 5.5 L8 12 l6.5 6.5" : "M9.5 5.5 L16 12 l-6.5 6.5"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Underline that slides and stretches between the active tab. */
+function InkSeg({
+  label,
+  inkKey,
+  children,
+}: {
+  label: string;
+  inkKey: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ink, setInk] = useState({ x: 0, y: 0, w: 0, on: false });
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const measure = () => {
+      const btn = root.querySelector<HTMLElement>("button.is-on, button[aria-selected='true']");
+      if (!btn) {
+        setInk((s) => (s.on ? { ...s, on: false } : s));
+        return;
+      }
+      setInk({
+        x: btn.offsetLeft,
+        y: btn.offsetTop + btn.offsetHeight - 1.5,
+        w: btn.offsetWidth,
+        on: true,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [inkKey]);
+
+  return (
+    <div className="seg" role="tablist" aria-label={label} ref={ref}>
+      <span
+        className={ink.on ? "seg-ink is-on" : "seg-ink"}
+        style={{ left: ink.x, top: ink.y, width: ink.w }}
+      />
+      {children}
+    </div>
+  );
+}
 
 export default function App() {
   const { lang, setLang, t } = useI18n();
@@ -45,25 +94,19 @@ export default function App() {
   const data = useStore((s) => s.data);
   const error = useStore((s) => s.error);
   const loading = useStore((s) => s.loading);
-  const selectModel = useStore((s) => s.selectModel);
   const refresh = useStore((s) => s.refresh);
   const toggleTheme = useStore((s) => s.toggleTheme);
+  const stepHour = useStore((s) => s.stepHour);
 
   const point = useStore((s) => s.point);
 
   const day = useStore((s) => s.day);
   const hourIdx = useStore((s) => s.hourIdx);
   const view = useStore((s) => s.view);
-  const activeZ = useStore((s) => s.activeZ);
-  const setActiveZ = useStore((s) => s.setActiveZ);
   const setView = useStore((s) => s.setView);
   const selectDay = useStore((s) => s.selectDay);
-  const selectHourTime = useStore((s) => s.selectHourTime);
 
   const compare = useStore((s) => s.compare);
-  const compareMode = useStore((s) => s.compareMode);
-  const entries = useStore((s) => s.entries);
-  const showAverage = useStore((s) => s.showAverage);
 
   const theme = useStore((s) => s.theme);
 
@@ -71,57 +114,28 @@ export default function App() {
   const [guide, setGuide] = useState(
     () => new URLSearchParams(window.location.search).get("guide") === "1",
   );
-  // tracks the compare flavor already reflected in the history, so the URL
-  // effect pushes a new entry only on a real transition (open, close or
-  // switch between the place and model boards)
-  const prevCompare = useRef<string | false>(
-    compare ? (compareMode === "model" ? "models" : "1") : false,
-  );
 
-  // the nav is derived from the state: no separate page flag to keep in sync
-  const page: Page = guide
-    ? "guide"
-    : compare
-      ? compareMode === "model"
-        ? "compare-models"
-        : "compare-places"
-      : "place";
+  const page: Page = guide ? "guide" : "place";
 
-  const MODEL_GROUP_LABEL: Record<ModelGroup, string> = {
-    nowcast: t.modelGroupNowcast,
-    lowLevel: t.modelGroupLowLevel,
-    allAltitude: t.modelGroupAllAltitude,
-    longRange: t.modelGroupLongRange,
-  };
-
-  // page views: place, the two compare boards and the guide; selections
-  // that stay on the same page (day, hour, pin, model) are not page views
   useEffect(() => {
     trackPageView(page);
   }, [page]);
 
   useEffect(() => {
     function onPop() {
-      const q = new URLSearchParams(window.location.search);
-      setGuide(q.get("guide") === "1");
-      const cmp = q.get("compare");
-      const on = cmp === "1" || cmp === "models";
-      // the history entry already carries this mode: don't push again
-      prevCompare.current = on ? cmp : false;
-      useStore
-        .getState()
-        .syncCompareFromUrl(
-          on,
-          q.get("pins"),
-          cmp === "models" ? "model" : "place",
-        );
+      const url = new URL(window.location.href);
+      setGuide(url.searchParams.get("guide") === "1");
+      if (url.searchParams.has("compare") || url.searchParams.has("pins")) {
+        url.searchParams.delete("compare");
+        url.searchParams.delete("pins");
+        window.history.replaceState(null, "", url);
+      }
+      if (useStore.getState().compare) useStore.getState().toggleCompare(false);
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // initial place name and first load; re-runs of this effect (StrictMode)
-  // abort the previous loads, as the old effect cleanup did
   useEffect(() => {
     const store = useStore.getState();
     store.ensurePlace();
@@ -129,25 +143,31 @@ export default function App() {
     store.loadEntries();
   }, []);
 
-  // keep the URL and the compare board in sync with the state; entering,
-  // leaving or switching the compare board is a navigation (pushState), so
-  // the browser back button walks through the pages
+  // Compare boards are gone. An old link or a stored board is closed, and
+  // the URL goes back to the place.
   useEffect(() => {
-    const flavor = compare ? (compareMode === "model" ? "models" : "1") : false;
-    const entering = flavor !== prevCompare.current;
-    prevCompare.current = flavor;
-    if (entering) {
-      const url = new URL(window.location.href);
-      if (flavor) url.searchParams.set("compare", flavor);
-      else {
-        url.searchParams.delete("compare");
-        url.searchParams.delete("pins");
-      }
-      window.history.pushState(null, "", url);
+    if (compare) {
+      useStore.getState().toggleCompare(false);
+      return;
     }
-    writeStateToUrl(point, modelId, compare, compareMode, entries);
-    storeCompare(compare, entries, showAverage);
-  }, [point, modelId, compare, compareMode, entries, showAverage]);
+    writeStateToUrl(point, modelId, false, "place", []);
+    storeCompare(false, [], false);
+  }, [point, modelId, compare]);
+
+  useEffect(() => {
+    if (view !== "sounding" || guide) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (el?.isContentEditable) return;
+      e.preventDefault();
+      stepHour(e.key === "ArrowLeft" ? -1 : 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, guide, stepHour]);
 
   function openGuide() {
     const url = new URL(window.location.href);
@@ -165,23 +185,18 @@ export default function App() {
 
   function navigate(next: Page) {
     if (next === page) return;
-    const store = useStore.getState();
     if (next === "guide") {
       openGuide();
       return;
     }
     if (guide) closeGuide();
-    if (next === "place") {
-      if (compare) store.toggleCompare(false);
-    } else if (next === "compare-places") {
-      store.toggleCompare(true, "place");
-    } else {
-      store.toggleCompare(true, "model");
-    }
   }
 
   function goHome(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("guide");
+    window.history.replaceState(null, "", url);
     setGuide(false);
     useStore.getState().goHome();
   }
@@ -191,21 +206,24 @@ export default function App() {
     [data, lang],
   );
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
-  const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
-  // the meteogram spans the whole 24 h of the selected day, not just the
-  // 07:00–22:00 display window
+  const dayIndex = days.findIndex((d) => d.key === activeDay);
+  const dayHours = days[dayIndex]?.hours ?? [];
   const meteoHours = useMemo(
     () => (data && activeDay ? meteoHoursForDay(data.hours, activeDay) : []),
     [data, activeDay],
   );
   const hour =
     dayHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? dayHours[0];
+  const hourIndex = hour ? dayHours.findIndex((h) => h.time === hour.time) : -1;
+  const canPrev = hourIndex > 0 || dayIndex > 0;
+  const canNext =
+    (hourIndex >= 0 && hourIndex < dayHours.length - 1) ||
+    (dayIndex >= 0 && dayIndex < days.length - 1);
 
   return (
     <div className="app">
       <header className="top">
         <div className="top-bar">
-          {/* left: logo */}
           <a
             className="brand-home"
             href="/"
@@ -213,31 +231,18 @@ export default function App() {
             title={t.homeAria}
             onClick={goHome}
           >
-            <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
-              <path
-                className="logo-wing"
-                d="M2.5 12.5 C8 4.5 24 4.5 29.5 12.5 C24 10 8 10 2.5 12.5 Z"
-              />
-              <path
-                className="logo-lines"
-                d="M3 12.7 L13.6 23.6 M29 12.7 L18.4 23.6 M16 11.6 L16 23.6"
-              />
-              <circle className="logo-pilot" cx="16" cy="26.4" r="2.7" />
-            </svg>
-            <h1>Weather4Paragliding</h1>
+            <span className="brand-lockup">
+              <h1>Weather4Paragliding</h1>
+            </span>
           </a>
-          {/* center: pages */}
           <PageNav page={page} onNavigate={navigate} />
-          {/* right: language and theme */}
           <div className="top-actions">
             <select
               className="lang-select"
               aria-label={t.langLabel}
               title={t.langLabel}
               value={lang}
-              onChange={(e) =>
-                setLang(e.target.value as (typeof LANGS)[number])
-              }
+              onChange={(e) => setLang(e.target.value as (typeof LANGS)[number])}
             >
               {LANGS.map((l) => (
                 <option key={l} value={l}>
@@ -252,208 +257,177 @@ export default function App() {
               title={theme === "dark" ? t.themeToLight : t.themeToDark}
               onClick={toggleTheme}
             >
-              {theme === "dark" ? "☀" : "☾"}
+              {theme === "dark" ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <path
+                    d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.1 5.1l1.6 1.6M17.3 17.3l1.6 1.6M18.9 5.1l-1.6 1.6M6.7 17.3l-1.6 1.6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M16.5 14.2A6.2 6.2 0 0 1 9.8 7.5 6.4 6.4 0 1 0 16.5 14.2z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </button>
           </div>
-        </div>
-        <div className="top-main">
-          {/* the Guide is static content: no selection controls in its
-              header, the slot stays empty on that page */}
-          {guide ? null : compare ? <BoardHead /> : <SiteForm />}
         </div>
       </header>
 
       {guide ? (
         <Guide />
       ) : (
-        <>
-          <div className="flash">
-            {error ? (
-              <div className="banner error" role="alert">
-                <span>{error}</span>
-                <button type="button" className="btn" onClick={refresh}>
-                  {t.retry}
-                </button>
-              </div>
-            ) : loading ? (
-              <div className="banner">{data ? t.updating : t.extracting}</div>
+        <div className="workspace">
+          <PlaceRail />
+          <main className="stage">
+            <div className="flash">
+              {error ? (
+                <div className="banner error" role="alert">
+                  <span>{error}</span>
+                  <button type="button" className="btn" onClick={refresh}>
+                    {t.retry}
+                  </button>
+                </div>
+              ) : loading ? (
+                <div className="banner">{data ? t.updating : t.extracting}</div>
+              ) : null}
+            </div>
+
+            <SiteForm />
+
+            {data ? (
+              <p className="meta">
+                <span>{interpolate(t.metaAlt, { m: data.modelElevationM })}</span>
+                <span>
+                  {interpolate(t.metaCache, { slot: utcSlot(data.runInitUtc) })}
+                </span>
+              </p>
             ) : null}
-          </div>
 
-          {data && !compare ? (
-            <p className="meta">
-              <span>
-                {data.lat.toFixed(3)}°N {data.lon.toFixed(3)}°E
-              </span>
-              <span>
-                {interpolate(t.metaCell, {
-                  lat: data.nearestCell.lat.toFixed(3),
-                  lon: data.nearestCell.lon.toFixed(3),
-                })}
-              </span>
-              <span>{interpolate(t.metaAlt, { m: data.modelElevationM })}</span>
-              <span>
-                {data.model} {data.grid} · {data.openMeteoModel ?? data.source}
-              </span>
-              <span>
-                {interpolate(t.metaCache, { slot: utcSlot(data.runInitUtc) })}
-              </span>
-            </p>
-          ) : null}
-
-          {data ? (
-            <>
-              <div className="toolbar">
-                {/* the model board picks its models explicitly: the single-model
-                select would be a confusing duplicate there */}
-                {!(compare && compareMode === "model") ? (
-                  <label className="pick">
-                    {t.modelLabel}
-                    <select
-                      value={modelId}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        if (isModelId(next)) {
-                          selectModel(next);
-                          trackEvent("model_selected", { model: next });
-                        }
-                      }}
-                    >
-                      {MODEL_GROUP_ORDER.map((group) => (
-                        <optgroup key={group} label={MODEL_GROUP_LABEL[group]}>
-                          {MODELS.filter((m) => m.group === group).map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.label} ·{" "}
-                              {interpolate(t.daysSuffix, { n: m.days })}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
-                <div className="seg" role="tablist" aria-label={t.dayTablist}>
-                  {days.map((d) => (
+            {data ? (
+              <>
+                <div className="toolbar">
+                  <InkSeg label={t.dayTablist} inkKey={`${activeDay ?? ""}-${lang}`}>
+                    {days.map((d) => (
+                      <button
+                        key={d.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={d.key === activeDay}
+                        className={d.key === activeDay ? "is-on" : undefined}
+                        onClick={() => selectDay(d.key)}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </InkSeg>
+                  <InkSeg label={t.viewTablist} inkKey={`${view}-${lang}`}>
                     <button
-                      key={d.key}
                       type="button"
-                      role="tab"
-                      aria-selected={d.key === activeDay}
-                      className={d.key === activeDay ? "is-on" : undefined}
-                      onClick={() => selectDay(d.key)}
+                      className={view === "windgram" ? "is-on" : undefined}
+                      onClick={() => setView("windgram")}
                     >
-                      {d.label}
+                      {t.viewWindgram}
                     </button>
-                  ))}
-                </div>
-                <div className="seg" role="tablist" aria-label={t.viewTablist}>
-                  <button
-                    type="button"
-                    className={view === "windgram" ? "is-on" : undefined}
-                    onClick={() => setView("windgram")}
-                  >
-                    {t.viewWindgram}
-                  </button>
-                  <button
-                    type="button"
-                    className={view === "meteogram" ? "is-on" : undefined}
-                    onClick={() => setView("meteogram")}
-                  >
-                    {t.viewMeteogram}
-                    <span className="beta-tag">beta</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={view === "sounding" ? "is-on" : undefined}
-                    onClick={() => setView("sounding")}
-                  >
-                    {t.viewSounding}
-                  </button>
-                </div>
-                {view === "sounding" ? (
-                  <label className="pick">
-                    {t.hourLabel}
-                    <select
-                      value={hour?.time ?? ""}
-                      onChange={(e) => selectHourTime(e.target.value)}
+                    <button
+                      type="button"
+                      className={view === "meteogram" ? "is-on" : undefined}
+                      onClick={() => setView("meteogram")}
                     >
-                      {dayHours.map((h) => (
-                        <option key={h.time} value={h.time}>
-                          {hourLabel(h.time)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
-              </div>
+                      {t.viewMeteogram}
+                      <span className="beta-tag">beta</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={view === "sounding" ? "is-on" : undefined}
+                      onClick={() => setView("sounding")}
+                    >
+                      {t.viewSounding}
+                    </button>
+                  </InkSeg>
+                </div>
 
-              {!compare ? (
-                view === "windgram" ? (
-                  <Windgram
-                    hours={dayHours}
-                    elevationM={data.modelElevationM}
-                    zMax={Z_MAX_M}
-                    compact={isMobile}
-                  />
-                ) : view === "meteogram" ? (
-                  meteoHours.length > 0 ? (
-                    <Meteogram
-                      hours={meteoHours}
+                <div className="chart-swap" key={view}>
+                  {view === "windgram" ? (
+                    <Windgram
+                      hours={dayHours}
                       elevationM={data.modelElevationM}
+                      zMax={Z_MAX_M}
                       compact={isMobile}
                     />
-                  ) : (
-                    <p className="board-card-note">{t.noDataDay}</p>
-                  )
-                ) : !soundingAvailable(data) ? (
-                  <p className="board-card-note">{t.soundingUnavailable}</p>
-                ) : hour ? (
-                  <>
-                    <SurfaceStats
-                      hour={hour}
-                      elevationM={data.modelElevationM}
-                    />
-                    <Sounding
-                      hour={hour}
-                      elevationM={data.modelElevationM}
-                      activeZ={activeZ}
-                      onActiveZ={setActiveZ}
-                    />
-                  </>
-                ) : null
-              ) : null}
+                  ) : view === "meteogram" ? (
+                    meteoHours.length > 0 ? (
+                      <Meteogram
+                        hours={meteoHours}
+                        elevationM={data.modelElevationM}
+                        compact={isMobile}
+                      />
+                    ) : (
+                      <p className="board-card-note">{t.noDataDay}</p>
+                    )
+                  ) : !soundingAvailable(data) ? (
+                    <p className="board-card-note">{t.soundingUnavailable}</p>
+                  ) : hour ? (
+                    <div className="sounding-stage">
+                      <button
+                        type="button"
+                        className="time-nudge"
+                        aria-label={t.prevHour}
+                        disabled={!canPrev}
+                        onClick={() => stepHour(-1)}
+                      >
+                        <Chevron dir="left" />
+                      </button>
+                      <div className="sounding-col">
+                        <p className="time-readout">{hourLabel(hour.time)}</p>
+                        <SurfaceStats hour={hour} elevationM={data.modelElevationM} />
+                        <Sounding hour={hour} elevationM={data.modelElevationM} />
+                      </div>
+                      <button
+                        type="button"
+                        className="time-nudge"
+                        aria-label={t.nextHour}
+                        disabled={!canNext}
+                        onClick={() => stepHour(1)}
+                      >
+                        <Chevron dir="right" />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
-              {compare ? (
-                <CompareBoard
-                  dayKey={activeDay ?? null}
-                  hourTime={hour?.time ?? null}
-                  view={view}
-                  zMax={Z_MAX_M}
-                  compact={isMobile}
-                />
-              ) : null}
-
-              <footer className="foot">
-                {data.attribution} ·{" "}
-                <a
-                  href="https://github.com/AurelienS/weather4paraglider/blob/main/LICENSE"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  AGPL-3.0
-                </a>{" "}
-                ·{" "}
-                <a
-                  href="https://github.com/AurelienS/weather4paraglider"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  GitHub
-                </a>
-              </footer>
-            </>
-          ) : null}
-        </>
+                <footer className="foot">
+                  {data.attribution} ·{" "}
+                  <a
+                    href="https://github.com/AurelienS/weather4paraglider/blob/main/LICENSE"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    AGPL-3.0
+                  </a>{" "}
+                  ·{" "}
+                  <a
+                    href="https://github.com/AurelienS/weather4paraglider"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    GitHub
+                  </a>
+                </footer>
+              </>
+            ) : null}
+          </main>
+        </div>
       )}
     </div>
   );

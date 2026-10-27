@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { groupByDay, dayLabel, utcSlot } from "../lib/format";
 import { meteoHoursForDay } from "../lib/meteogram";
 import { interpolate } from "../lib/i18n";
@@ -27,7 +27,6 @@ type Props = {
  * derived from the loaded model cards, not a board entry. */
 export function AverageCard({ data, count, dayKey, hourTime, view, zMax, compact }: Props) {
   const { t, lang } = useI18n();
-  const [activeZ, setActiveZ] = useState<number | null>(null);
   const days = useMemo(() => groupByDay(data.hours, lang), [data, lang]);
   const effDay = dayKey != null && days.some((d) => d.key === dayKey) ? dayKey : days[0]?.key;
   const hours = days.find((d) => d.key === effDay)?.hours ?? [];
@@ -61,12 +60,7 @@ export function AverageCard({ data, count, dayKey, hourTime, view, zMax, compact
       ) : hour ? (
         <>
           <SurfaceStats hour={hour} elevationM={data.modelElevationM} />
-          <Sounding
-            hour={hour}
-            elevationM={data.modelElevationM}
-            activeZ={activeZ}
-            onActiveZ={setActiveZ}
-          />
+          <Sounding hour={hour} elevationM={data.modelElevationM} />
         </>
       ) : (
         <p className="board-card-note">{t.noDataDay}</p>

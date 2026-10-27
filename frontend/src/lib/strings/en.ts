@@ -29,6 +29,8 @@ export const en = {
   meteoLblWind: "Wind",
   meteoLblGust: "Gusts",
   hourLabel: "Hour",
+  prevHour: "Previous hour",
+  nextHour: "Next hour",
   navAria: "Main pages",
   tabPlace: "Place",
   tabGuide: "Guide",
@@ -58,7 +60,9 @@ export const en = {
   noResults: "No results.",
   favorites: "Favorites ({n})",
   favoritesEmpty: "No favorites yet.",
-  favoritesEmptyHint: "Load a place, then press “+ Favorite” to keep it here.",
+  favoritesEmptyHint: "Load a place, then press the star to keep it here.",
+  railFavorites: "Favorites",
+  recentEmpty: "Places you open show up here.",
   removeFavoriteAria: "Remove {label} from favorites",
   alreadyInCompare: "Already in the comparison",
   mapOpen: "Map…",
@@ -120,7 +124,7 @@ export const en = {
   pinRun: "run {day} {slot} UTC",
   errNoData:
     "{model} has no data for this location: this model covers a smaller area. " +
-    "Pick another model in the toolbar (AROME covers all of France).",
+    "Pick the other model in the side column (AROME covers all of France).",
   errRateLimit:
     "Open-Meteo rate limit reached for your connection. " +
     "The app queries this free service directly; its quota is counted " +
@@ -148,22 +152,19 @@ export const en = {
   guideModelsTitle: "Which model should I use?",
   guideModelsP1:
     "AROME France 2.5 km is the reference for mainland France: it covers the whole " +
-    "country and strikes a good balance between detail and reliability. Use AROME " +
-    "15 min for the next few hours, and ARPEGE Europe to look 4–5 days ahead.",
+    "country, reaches the high-altitude layers, and runs about three days ahead.",
   guideModelsP2:
-    "AROME HD 1.3 km and MeteoSwiss ICON-CH1 1 km resolve the terrain much finer. " +
-    "They carry no high-altitude layers, so their windgram stops a few hundred meters " +
-    "above the peaks — but for what happens close to the ground (takeoff, ridge, " +
-    "valley breeze) they are the most precise, and they shine along the coast, where " +
-    "coarser models smooth the sea breeze away.",
+    "DWD ICON D2 2.2 km is the second reading — Germany, the Alps and most of France, " +
+    "over about two days, with the same kind of vertical profile. Switch between the " +
+    "two in the side column. When they disagree, that disagreement is the forecast.",
   guideLimitsTitle: "Geographic coverage",
   guideLimitsP1:
-    "Each model only covers its own area: AROME France and its neighbors, ICON-CH1 " +
-    "the Alps around Switzerland, ICON-D2 Germany and the Alps, HARMONIE northern and " +
-    "central Europe. Open-Meteo simply has no data outside a model's grid.",
+    "AROME covers France and its neighbors. ICON D2 covers Germany, the Alps and most " +
+    "of France, but not the far south-east coast. Open-Meteo has no data outside a " +
+    "model's grid.",
   guideLimitsP2:
     "When your point is outside, the app tells you so instead of silently showing a " +
-    "neighboring cell — just pick another model in the toolbar.",
+    "neighboring cell — just pick the other model in the side column.",
   guideQuotaTitle: "The Open-Meteo quota",
   guideQuotaP1:
     "The app talks straight to Open-Meteo, a free service; there is no server in " +
@@ -171,7 +172,7 @@ export const en = {
     "session can hit the limit — it renews on its own after a few minutes.",
   guideQuotaP2:
     "Results are cached in your browser (3 h slot, 1 h for the nowcast): browsing " +
-    "days, altitudes or the comparison board costs nothing. The Refresh button is " +
+    "days or hours costs nothing. The Refresh button is " +
     "the only action that forces a real call.",
   guideGramTitle: "Reading the windgram",
   guideGramP1:
@@ -181,8 +182,9 @@ export const en = {
     "the speed, from light green to warning red. The small reddish number under " +
     "the speed is the gust, shown only when it adds 5 km/h or more.",
   guideGramP2:
-    "The cell background is the thermal, on a paraglider scale: green is a weak " +
-    "climb, yellow a good one, red a strong one and violet a rough day. A gray " +
+    "The cell background is the thermal, on a paraglider scale: teal is under the " +
+    "wing's sink, gold is a climb, vermilion is strong and violet is a rough day. " +
+    "Inside one color only the strength changes. A gray " +
     "veil means clouds. Hover a cell to read the temperature, " +
     "the updraft in m/s and the cloud cover. That speed is the average climb of a dry " +
     "thermal before your wing's sink — a cloud overhead can add more, and a strong " +
@@ -210,17 +212,17 @@ export const en = {
   guideSoundP3:
     "Where the orange and blue curves pinch together, the air is nearly saturated: " +
     "that is the cloud base. Hover the chart to read the exact temperature and dew " +
-    "point at any altitude; the wind profile is drawn on the right.",
+    "point at any altitude; the wind profile is drawn on the right. The arrows on " +
+    "either side of the chart move one hour at a time, into the next or previous day.",
   guideWhyTitle: "Why this app?",
   guideWhyModels:
-    "Serious models only: AROME, ARPEGE, MeteoSwiss ICON-CH1, DWD ICON-D2, DMI " +
-    "HARMONIE — maintained by national weather services with serious means, and " +
-    "you pick the one that fits your spot.",
+    "Two serious models: Météo-France AROME 2.5 km and DWD ICON D2, both with the " +
+    "high-altitude layers a paraglider flies. One click switches between them.",
   guideWhyFree:
     "Completely free, no account, no ads: the whole app runs in your browser.",
   guideWhyCompare:
-    "Several places side by side on the same page: pin your takeoff, the landing " +
-    "and the flatland valley and compare them hour by hour.",
+    "Favorites and recent places stay on screen: one click and the chart follows " +
+    "you from takeoff to landing.",
   guideWhyRuns:
     "Always the latest run of each model, as soon as Open-Meteo publishes it — " +
     "unlike some commercial sites that often show a single run per day.",
@@ -228,8 +230,7 @@ export const en = {
   guideDataP1:
     "Weather4Paragliding has no server of its own: your browser calls the " +
     "Open-Meteo API directly, a free service that redistributes the raw output of " +
-    "the national models (Météo-France AROME and ARPEGE, MeteoSwiss ICON-CH1, DWD " +
-    "ICON-D2, DMI HARMONIE).",
+    "national models. This app reads Météo-France AROME 2.5 km and DWD ICON D2.",
   guideDataP2:
     "Keep in mind what a forecast is: the output of a model run, not an " +
     "observation. A point readout is the nearest grid cell, so a sharp ridge or a " +

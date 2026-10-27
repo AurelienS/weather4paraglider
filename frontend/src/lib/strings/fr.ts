@@ -30,6 +30,8 @@ export const fr: Dict = {
   meteoLblWind: "Vent",
   meteoLblGust: "Rafales",
   hourLabel: "Heure",
+  prevHour: "Heure précédente",
+  nextHour: "Heure suivante",
   navAria: "Pages principales",
   tabPlace: "Lieu",
   tabGuide: "Guide",
@@ -59,7 +61,9 @@ export const fr: Dict = {
   noResults: "Aucun résultat.",
   favorites: "Favoris ({n})",
   favoritesEmpty: "Aucun favori pour l'instant.",
-  favoritesEmptyHint: "Chargez un lieu puis « + Favori » pour le garder ici.",
+  favoritesEmptyHint: "Chargez un lieu, puis l'étoile pour le garder ici.",
+  railFavorites: "Favoris",
+  recentEmpty: "Les lieux que vous ouvrez s'affichent ici.",
   removeFavoriteAria: "Retirer {label} des favoris",
   alreadyInCompare: "Déjà dans la comparaison",
   mapOpen: "Carte…",
@@ -121,7 +125,7 @@ export const fr: Dict = {
   pinRun: "run {day} {slot} UTC",
   errNoData:
     "{model} n'a pas de données pour ce lieu : ce modèle couvre une zone plus petite. " +
-    "Choisissez un autre modèle dans la barre d'outils (AROME couvre toute la France).",
+    "Choisissez l'autre modèle dans la colonne (AROME couvre toute la France).",
   errRateLimit:
     "Limite Open-Meteo atteinte pour votre connexion. " +
     "L'application interroge ce service gratuit directement ; son quota est compté " +
@@ -152,24 +156,20 @@ export const fr: Dict = {
   guideModelsTitle: "Quel modèle utiliser ?",
   guideModelsP1:
     "AROME France 2,5 km est la référence pour la France métropolitaine : il couvre " +
-    "tout le pays et trouve un bon équilibre entre détail et fiabilité. Utilisez AROME " +
-    "15 min pour les prochaines heures, et ARPEGE Europe pour regarder à 4–5 jours.",
+    "tout le pays, monte jusqu'aux couches d'altitude, et voit environ trois jours.",
   guideModelsP2:
-    "AROME HD 1,3 km et MeteoSwiss ICON-CH1 1 km résolvent le terrain beaucoup plus " +
-    "finement. Ils n'ont pas de couches hautes, donc leur windgram s'arrête quelques " +
-    "centaines de mètres au-dessus des sommets — mais pour ce qui se passe près du " +
-    "sol (décollage, crête, brise de vallée) ce sont les plus précis, et ils " +
-    "excellent au bord de la mer, là où les modèles grossiers lissent la brise de mer.",
+    "ICON D2 2,2 km du DWD est la seconde lecture — Allemagne, Alpes et grande partie " +
+    "de la France, sur environ deux jours, avec le même genre de profil vertical. " +
+    "On passe de l'un à l'autre dans la colonne. Quand ils divergent, cet écart est " +
+    "la prévision.",
   guideLimitsTitle: "Couverture géographique",
   guideLimitsP1:
-    "Chaque modèle ne couvre que sa zone : AROME la France et ses voisins, ICON-CH1 " +
-    "les Alpes autour de la Suisse, ICON-D2 l'Allemagne et les Alpes, HARMONIE le " +
-    "nord et le centre de l'Europe. Open-Meteo n'a simplement pas de données en " +
-    "dehors de la grille d'un modèle.",
+    "AROME couvre la France et ses voisins. ICON D2 couvre l'Allemagne, les Alpes et " +
+    "la plus grande partie de la France, mais pas l'extrême sud-est de la côte. " +
+    "Open-Meteo n'a pas de données en dehors de la grille d'un modèle.",
   guideLimitsP2:
     "Quand votre point est dehors, l'application vous le dit au lieu d'afficher " +
-    "silencieusement une cellule voisine — choisissez simplement un autre modèle " +
-    "dans la barre d'outils.",
+    "silencieusement une cellule voisine — choisissez l'autre modèle dans la colonne.",
   guideQuotaTitle: "Le quota Open-Meteo",
   guideQuotaP1:
     "L'application parle directement à Open-Meteo, un service gratuit ; il n'y a pas " +
@@ -178,8 +178,8 @@ export const fr: Dict = {
     "toute seule au bout de quelques minutes.",
   guideQuotaP2:
     "Les résultats sont mis en cache dans votre navigateur (créneau de 3 h, 1 h pour " +
-    "la prévision immédiate) : naviguer entre les jours, les altitudes ou la " +
-    "comparaison ne coûte rien. Le bouton Rafraîchir est la seule action qui force " +
+    "la prévision immédiate) : naviguer entre les jours ou les heures ne coûte " +
+    "rien. Le bouton Rafraîchir est la seule action qui force " +
     "un vrai appel.",
   guideGramTitle: "Lire le windgram",
   guideGramP1:
@@ -189,9 +189,10 @@ export const fr: Dict = {
     "la vitesse, du vert pâle au rouge d'alerte. Le petit chiffre rouge brique " +
     "sous la vitesse est la rafale, affichée seulement si elle ajoute 5 km/h ou plus.",
   guideGramP2:
-    "Le fond de la case est le thermique, sur une échelle de parapente : vert, " +
-    "une ascendance faible ; jaune, une bonne ; rouge, une forte ; violet, une " +
-    "journée musclée. Un voile gris signale les nuages. Survolez une case pour lire " +
+    "Le fond de la case est le thermique, sur une échelle de parapente : sarcelle " +
+    "sous la chute de l'aile, or pour une ascendance, vermillon pour une forte, " +
+    "violet pour une journée musclée. Dans une même couleur, seule l'intensité " +
+    "change. Un voile gris signale les nuages. Survolez une case pour lire " +
     "la température, l'ascendance en m/s et la couverture nuageuse. Cette vitesse est " +
     "la montée moyenne d'un thermique sec, avant le taux de chute de l'aile — un " +
     "cumulus au-dessus peut en ajouter, et un vent qui forcit avec l'altitude peut " +
@@ -220,17 +221,19 @@ export const fr: Dict = {
   guideSoundP3:
     "Là où les courbes orange et bleue se rapprochent, l'air est presque saturé : " +
     "c'est la base des nuages. Survolez le graphique pour lire la température et " +
-    "le point de rosée exacts à chaque altitude ; le profil du vent est dessiné à droite.",
+    "le point de rosée exacts à chaque altitude ; le profil du vent est dessiné à droite. " +
+    "Les flèches de chaque côté du graphique avancent ou reculent d'une heure, " +
+    "y compris sur le jour suivant ou précédent.",
   guideWhyTitle: "Pourquoi cette appli ?",
   guideWhyModels:
-    "Des modèles sérieux seulement : AROME, ARPEGE, ICON-CH1 de MétéoSuisse, " +
-    "ICON-D2 du DWD, HARMONIE du DMI — maintenus par des services météo " +
-    "nationaux avec de vrais moyens, et vous choisissez celui qui colle à votre spot.",
+    "Deux modèles sérieux : AROME 2,5 km de Météo-France et ICON D2 du DWD, tous " +
+    "deux avec les couches d'altitude qu'un parapente vole. Un clic pour passer " +
+    "de l'un à l'autre.",
   guideWhyFree:
     "Totalement gratuit, sans compte, sans pub : toute l'appli tourne dans votre navigateur.",
   guideWhyCompare:
-    "Plusieurs lieux côte à côte sur la même page : épinglez le déco, l'atterro et " +
-    "la vallée d'à côté et comparez-les heure par heure.",
+    "Les favoris et les lieux récents restent à l'écran : un clic, et le graphique " +
+    "vous suit du décollage à l'atterrissage.",
   guideWhyRuns:
     "Toujours le dernier run de chaque modèle, dès qu'Open-Meteo le publie — " +
     "contrairement à certains sites payants qui n'affichent souvent qu'un run par jour.",
@@ -238,8 +241,8 @@ export const fr: Dict = {
   guideDataP1:
     "Weather4Paragliding n'a pas de serveur : votre navigateur appelle " +
     "directement l'API Open-Meteo, un service gratuit qui redistribue la sortie " +
-    "brute des modèles nationaux (AROME et ARPEGE de Météo-France, ICON-CH1 de " +
-    "MétéoSuisse, ICON-D2 du DWD, HARMONIE du DMI).",
+    "brute des modèles nationaux. Cette application lit AROME 2,5 km de " +
+    "Météo-France et ICON D2 du DWD.",
   guideDataP2:
     "Gardez en tête ce qu'est une prévision : la sortie d'un run de modèle, pas " +
     "une observation. Une valeur ponctuelle est la maille la plus proche : une " +

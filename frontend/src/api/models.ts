@@ -207,6 +207,10 @@ export const MODELS: readonly ModelDef[] = [
 
 export const DEFAULT_MODEL: ModelId = "arome_france";
 
+/** The two models offered in the place column. The rest of the catalog stays
+ * so an old shared link still opens, but the UI no longer lists them. */
+export const PRIMARY_MODELS: readonly ModelId[] = ["arome_france", "icon_d2"];
+
 /** Dropdown grouping of the model select, in display order: the all-altitude
  * reference models first, then the ground-precision specialists, the nowcast
  * and finally the longer-range models. Shared by the main select and the

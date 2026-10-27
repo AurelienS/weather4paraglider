@@ -1,8 +1,10 @@
-import { useId, useMemo, type MouseEvent } from "react";
-import type { Hour, ProfilePoint } from "../api/types";
+import { useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import type { Hour } from "../api/types";
 import { clamp, linePath, niceRange, ticks } from "../lib/chart";
-import { compass, srcLabel } from "../lib/format";
+import { sampleAt, sampleDir } from "../lib/cursor";
+import { compass } from "../lib/format";
 import { interpolate, type Dict, type Lang } from "../lib/i18n";
+import { smoothPath } from "../lib/meteogram";
 import { useI18n } from "../i18nContext";
 
 const VB_W = 920;
@@ -15,35 +17,69 @@ const DALR = 9.8;
 type Props = {
   hour: Hour;
   elevationM: number;
-  activeZ: number | null;
-  onActiveZ: (z: number | null) => void;
 };
 
-export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
+type LevelRead = {
+  z: number;
+  y: number;
+  t: number | null;
+  td: number | null;
+  wind: number | null;
+  dir: number | null;
+  rh: number | null;
+  cloud: number | null;
+};
+
+type HoverBox = LevelRead & { left: number; top: number; flip: boolean };
+
+export function Sounding({ hour, elevationM }: Props) {
   const { t, lang } = useI18n();
   const layout = useMemo(() => buildLayout(hour, elevationM), [hour, elevationM]);
   const uid = useId().replace(/:/g, "");
 
-  function onMove(e: MouseEvent<SVGSVGElement>) {
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [card, setCard] = useState<HoverBox | null>(null);
+
+  function onMove(e: PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
+    const plot = plotRef.current?.getBoundingClientRect();
+    if (!plot || rect.height === 0 || rect.width === 0) return;
     const y = ((e.clientY - rect.top) / rect.height) * VB_H;
+    if (y < PAD.top || y > layout.plotBottom) {
+      setCard(null);
+      return;
+    }
     const z = layout.yToZ(y);
-    const nearest = nearestPoint(hour.profile, z);
-    onActiveZ(nearest?.z ?? null);
+    const read = readLevel(hour, z);
+    const left = e.clientX - plot.left;
+    const top = e.clientY - plot.top;
+    const next: HoverBox = { ...read, y, left, top, flip: left > plot.width - 210 };
+    setCard((prev) =>
+      prev &&
+      prev.z === next.z &&
+      prev.left === next.left &&
+      prev.top === next.top &&
+      prev.flip === next.flip
+        ? prev
+        : next,
+    );
   }
 
-  const hover = hour.profile.find((p) => p.z === activeZ) ?? null;
-  const hy = hover ? layout.yOf(hover.z) : null;
+  function onLeave() {
+    setCard(null);
+  }
 
   return (
-    <div className="sounding-wrap">
+    <div className="sounding-frame">
+      <div className="sounding-plot" ref={plotRef}>
+      <div className="sounding-scroll">
       <svg
         className="sounding"
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         role="img"
         aria-label={t.soundingAria}
-        onMouseMove={onMove}
-        onMouseLeave={() => onActiveZ(null)}
+        onPointerMove={onMove}
+        onPointerLeave={onLeave}
       >
         <defs>
           <clipPath id={`temp-${uid}`}>
@@ -66,6 +102,15 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
         <rect x="0" y="0" width={VB_W} height={VB_H} className="chart-bg" />
 
         <g className="plot-temp">
+          {layout.dalrX != null ? (
+            <rect
+              x={PAD.left}
+              y={PAD.top}
+              width={Math.max(0, Math.min(layout.dalrX, layout.tempRight) - PAD.left)}
+              height={layout.plotH}
+              className="unstable-wash"
+            />
+          ) : null}
           {layout.zTicks.map((z) => {
             const y = layout.yOf(z);
             return (
@@ -161,6 +206,14 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
           <text x={layout.tempRight - 6} y={PAD.top + 14} className="anno" textAnchor="end">
             {t.stable}
           </text>
+          <rect
+            x={PAD.left}
+            y={PAD.top}
+            width={layout.tempRight - PAD.left}
+            height={layout.plotH}
+            className="plot-frame"
+            fill="none"
+          />
         </g>
 
         <g className="plot-wind">
@@ -191,19 +244,53 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
           <g clipPath={`url(#wind-${uid})`}>
             {layout.windPath ? <path d={layout.windPath} className="curve-wind" /> : null}
             {layout.windDots.map((d) => (
-              <circle
-                key={`wdot-${d.z}`}
-                cx={d.x}
-                cy={d.y}
-                r={d.z === activeZ ? 3.2 : 2.2}
-                className="wind-dot"
-              />
+              <circle key={`wdot-${d.z}`} cx={d.x} cy={d.y} r="2.2" className="wind-dot" />
             ))}
           </g>
+          <rect
+            x={layout.windLeft}
+            y={PAD.top}
+            width={layout.windRight - layout.windLeft}
+            height={layout.plotH}
+            className="plot-frame"
+            fill="none"
+          />
         </g>
 
-        {hy != null ? (
-          <line x1={PAD.left} y1={hy} x2={layout.windRight} y2={hy} className="hover-line" />
+        {card ? (
+          <g className="cursor" pointerEvents="none">
+            <line
+              x1={PAD.left}
+              y1={card.y}
+              x2={layout.windRight}
+              y2={card.y}
+              className="hover-line"
+            />
+            {card.t != null ? (
+              <circle
+                cx={layout.xTh(thetaOf(card.t, card.z, elevationM))}
+                cy={card.y}
+                r="3.5"
+                className="cursor-dot t"
+              />
+            ) : null}
+            {card.td != null ? (
+              <circle
+                cx={layout.xTh(thetaOf(card.td, card.z, elevationM))}
+                cy={card.y}
+                r="3.2"
+                className="cursor-dot td"
+              />
+            ) : null}
+            {card.wind != null ? (
+              <circle
+                cx={layout.xW(card.wind)}
+                cy={card.y}
+                r="3.2"
+                className="cursor-dot wind"
+              />
+            ) : null}
+          </g>
         ) : null}
 
         <text x={PAD.left} y={18} className="axis-title">
@@ -216,10 +303,11 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
           m
         </text>
       </svg>
-
-      {hover ? (
-        <HoverCard point={hover} x={layout.tempRight} y={layout.yOf(hover.z)} t={t} lang={lang} />
+      </div>
+      {card ? (
+        <HoverCard read={card} left={card.left} top={card.top} flip={card.flip} t={t} lang={lang} />
       ) : null}
+      </div>
 
       <ul className="legend">
         <li>
@@ -241,60 +329,60 @@ export function Sounding({ hour, elevationM, activeZ, onActiveZ }: Props) {
 }
 
 function HoverCard({
-  point,
-  x,
-  y,
+  read,
+  left,
+  top,
+  flip,
   t,
   lang,
 }: {
-  point: ProfilePoint;
-  x: number;
-  y: number;
+  read: LevelRead;
+  left: number;
+  top: number;
+  flip: boolean;
   t: Dict;
   lang: Lang;
 }) {
-  const spread = point.t != null && point.td != null ? (point.t - point.td).toFixed(1) : null;
+  const spread = read.t != null && read.td != null ? (read.t - read.td).toFixed(1) : null;
+  const style: CSSProperties = { left, top };
+  const wind =
+    read.wind == null
+      ? t.hoverWind
+      : `${Math.round(read.wind)} km/h ${compass(read.dir, lang)}`;
   return (
-    <div
-      className="hover-card"
-      style={{
-        left: `${(x / VB_W) * 100}%`,
-        top: `${(y / VB_H) * 100}%`,
-      }}
-    >
-      <strong>
-        {point.z} m · {srcLabel(point.src)}
-      </strong>
+    <div className={flip ? "hover-card is-flip" : "hover-card"} style={style}>
+      <strong>{Math.round(read.z)} m</strong>
       <span>
-        T {fmt(point.t)} · Td {fmt(point.td)}
+        T {fmt(read.t)} · Td {fmt(read.td)}
         {spread ? ` · ${interpolate(t.hintSpread, { x: spread })}` : ""}
       </span>
       <span>
-        {point.wind == null ? t.hoverWind : `${point.wind} km/h ${compass(point.dir, lang)}`}
-        {point.rh != null ? ` · RH ${point.rh}%` : ""}
-        {point.cloud != null
-          ? ` · ${interpolate(t.hoverCloud, { n: point.cloud })}`
-          : ""}
+        {wind}
+        {read.rh != null ? ` · RH ${Math.round(read.rh)}%` : ""}
+        {read.cloud != null ? ` · ${interpolate(t.hoverCloud, { n: Math.round(read.cloud) })}` : ""}
       </span>
     </div>
   );
 }
 
-function fmt(v: number | null): string {
-  return v == null ? "—" : `${v.toFixed(1)}°`;
+function readLevel(hour: Hour, z: number): LevelRead {
+  const pts = hour.profile;
+  const at = (pick: (p: (typeof pts)[number]) => number | null) =>
+    pts.map((p) => ({ at: p.z, value: pick(p) }));
+  return {
+    z,
+    y: 0,
+    t: sampleAt(at((p) => p.t), z),
+    td: sampleAt(at((p) => p.td), z),
+    wind: sampleAt(at((p) => p.wind), z),
+    dir: sampleDir(at((p) => p.dir), z),
+    rh: sampleAt(at((p) => p.rh), z),
+    cloud: sampleAt(at((p) => p.cloud), z),
+  };
 }
 
-function nearestPoint(profile: ProfilePoint[], z: number): ProfilePoint | null {
-  let best: ProfilePoint | null = null;
-  let bestD = Infinity;
-  for (const p of profile) {
-    const d = Math.abs(p.z - z);
-    if (d < bestD) {
-      bestD = d;
-      best = p;
-    }
-  }
-  return best;
+function fmt(v: number | null): string {
+  return v == null ? "—" : `${v.toFixed(1)}°`;
 }
 
 function thetaOf(t: number, z: number, zRef: number): number {
@@ -399,10 +487,10 @@ function buildLayout(hour: Hour, elevationM: number) {
     zTicks: ticks(zMin, zMax, 500),
     thTicks: ticks(thMin, thMax, 5),
     wTicks: ticks(0, wMax, 20),
-    tPath: linePath(tPts),
-    tdPath: tdPts.length >= 2 ? linePath(tdPts) : "",
+    tPath: tPts.length >= 2 ? smoothPath(tPts) : linePath(tPts),
+    tdPath: tdPts.length >= 2 ? smoothPath(tdPts) : "",
     tdDots: tdPts,
-    windPath: windPts.length >= 2 ? linePath(windPts) : "",
+    windPath: windPts.length >= 2 ? smoothPath(windPts) : "",
     windDots: windPts,
     dalrX,
     isoPaths,

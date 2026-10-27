@@ -28,15 +28,15 @@ function stamp(dayOffset: number, hour: number, minute = 0): string {
   return `${iso}T${pad(hour)}:${pad(minute)}`;
 }
 
-/** 0 at night, a sine from 07:00 to 18:00. Morning stays stable (x < 0.15). */
+/** 0 at night, a sine from 08:00 to 18:00. The first flying hour stays stable (x < 0.15). */
 function sunFactor(hour: number): number {
-  if (hour < 7 || hour > 18) return 0;
-  return Math.sin(((hour - 7) / 11) * Math.PI);
+  if (hour < 8 || hour > 18) return 0;
+  return Math.sin(((hour - 8) / 10) * Math.PI);
 }
 
 /**
  * One temperature profile for every level. Before late morning the lapse is
- * the standard 6.5 K/km, so the 07:00 freezing level stays between 2250 and
+ * the standard 6.5 K/km, so the 08:00 freezing level stays between 2250 and
  * 2500 m at the default elevation. Later, a mixed layer grows under a cap.
  */
 function airTemp(z: number, hour: number, elev: number): number {
@@ -52,7 +52,7 @@ function airTemp(z: number, hour: number, elev: number): number {
 function valueFor(v: string, hour: number, elev: number): number | null {
   if (v === "sensible_heat_flux" || v === "latent_heat_flux") return null;
   if (v === "shortwave_radiation") {
-    return hour < 7 || hour > 18 ? 0 : Math.round(700 * sunFactor(hour));
+    return hour < 8 || hour > 18 ? 0 : Math.round(700 * sunFactor(hour));
   }
   if (v === "temperature_2m") return Math.round(airTemp(elev + 2, hour, elev) * 10) / 10;
   if (v === "dew_point_2m") return Math.round((airTemp(elev + 2, hour, elev) - 6) * 10) / 10;

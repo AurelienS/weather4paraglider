@@ -23,27 +23,28 @@ export type RGB = [number, number, number];
 
 /**
  * Dry-updraft tint, before the wing's sink (about 1.1 m/s on a normal
- * paraglider). The steps are what that sink turns the number into:
- *   0.5  green    slower than the sink, most wings descend
- *   1.0  green    scratchy, a light climb at best
- *   1.5  lime     a patient climb
- *   2.0  yellow   a good climb, about 1 m/s on the vario
- *   2.5  orange   strong
- *   3.5  red      very strong
- *   4.5  magenta  rough
- *   6    violet   extreme; the average rarely gets here
- * Each color stays light so the dark speed number keeps its contrast.
+ * paraglider). Four hues, and only the strength changes inside a hue —
+ * the bands do not blend, or the grid turns olive again:
+ *   0–0.5    paper     a trace, not a climb
+ *   0.5–1.2  teal      under the sink, a scratch at best
+ *   1.2–2.2  gold      a climb, about 1 m/s on the vario at the top
+ *   2.2–3.5  vermilion strong
+ *   3.5–6    violet    rough; the average rarely passes 6
+ * Wind arrows keep their own green–red scale. Each tint stays light enough
+ * for the dark speed number.
  */
-export const THERMAL_STOPS: readonly [number, RGB][] = [
-  [0.5, [177, 217, 171]],
-  [1.0, [131, 208, 128]],
-  [1.5, [173, 210, 86]],
-  [2.0, [240, 197, 56]],
-  [2.5, [242, 142, 54]],
-  [3.5, [228, 98, 88]],
-  [4.5, [213, 123, 171]],
-  [6.0, [180, 139, 208]],
+const THERMAL_BANDS: readonly { from: number; to: number; wash: RGB; solid: RGB }[] = [
+  { from: 0.5, to: 1.2, wash: [198, 224, 216], solid: [110, 186, 174] },
+  { from: 1.2, to: 2.2, wash: [246, 228, 170], solid: [232, 186, 78] },
+  { from: 2.2, to: 3.5, wash: [242, 170, 148], solid: [214, 96, 84] },
+  { from: 3.5, to: 6, wash: [214, 160, 196], solid: [168, 124, 198] },
 ];
+
+/** Legend stops: a wash and a solid per band, so the guide bar cuts cleanly. */
+export const THERMAL_STOPS: readonly [number, RGB][] = THERMAL_BANDS.flatMap((band) => [
+  [band.from, band.wash] as [number, RGB],
+  [band.to, band.solid] as [number, RGB],
+]);
 
 const WIND_STOPS: [number, RGB][] = [
   [0, [46, 168, 88]],
@@ -141,13 +142,29 @@ export function windRgb(kmh: number): RGB {
   return rampRgb(WIND_STOPS, kmh, [46, 168, 88]);
 }
 
+const PAPER: RGB = [255, 255, 255];
+/** Updraft where the first teal wash is reached. Below it the tint fades out. */
+const TRACE_MS = 0.5;
+
 export function thermalRgb(wMs: number): RGB {
-  return rampRgb(THERMAL_STOPS, wMs, [177, 217, 171]);
+  const first = THERMAL_BANDS[0];
+  const last = THERMAL_BANDS[THERMAL_BANDS.length - 1];
+  if (!first || !last || wMs <= 0) return PAPER;
+  if (wMs < TRACE_MS) {
+    // Squared so 0.1 m/s is about 4% of the way to teal: a trace, not a tint.
+    const t = (wMs / TRACE_MS) ** 2;
+    return lerpRgb(PAPER, first.wash, t);
+  }
+  if (wMs >= last.to) return last.solid;
+  const band = THERMAL_BANDS.find((item) => wMs < item.to) ?? last;
+  const span = band.to - band.from;
+  const t = span <= 0 ? 1 : (wMs - band.from) / span;
+  return lerpRgb(band.wash, band.solid, Math.min(1, Math.max(0, t)));
 }
 
 export function cellBackground(wMs: number, cloud: number | null): RGB {
-  let rgb: RGB = [255, 255, 255];
-  if (wMs > 0.05) rgb = thermalRgb(wMs);
+  let rgb: RGB = PAPER;
+  if (wMs > 0) rgb = thermalRgb(wMs);
   if (cloud != null && cloud >= 10) {
     const fog = 0.14 + 0.36 * ((cloud - 10) / 90);
     rgb = lerpRgb(rgb, [148, 150, 154], fog);

@@ -80,12 +80,12 @@ export function hourOfDay(iso: string): number {
 }
 
 export const DISPLAY_HOURS = [
-  7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
 ] as const;
 
 export function isDisplayHour(iso: string): boolean {
   const h = hourOfDay(iso);
-  return h >= 7 && h <= 22;
+  return h >= 8 && h <= 21;
 }
 
 export type HourSlot = {
@@ -192,9 +192,11 @@ export function selectionAfterLoad(
   const kept =
     prevDay == null ? undefined : groupByDay(hours).find((d) => d.key === prevDay);
   if (!kept) {
-    const idx = pickDefaultHour(hours);
-    const chosen = hours[idx];
-    return { day: chosen ? dayKey(chosen.time) : null, hourIdx: idx };
+    const visible = hours.filter((h) => isDisplayHour(h.time));
+    const pool = visible.length > 0 ? visible : hours;
+    const chosen = pool[pickDefaultHour(pool)];
+    const hourIdx = chosen ? hours.findIndex((h) => h.time === chosen.time) : 0;
+    return { day: chosen ? dayKey(chosen.time) : null, hourIdx: hourIdx >= 0 ? hourIdx : 0 };
   }
   let target = kept.hours[0];
   if (prevHourTime != null) {

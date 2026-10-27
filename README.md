@@ -6,7 +6,7 @@ ICON-D2, DMI HARMONIE) is fetched directly from the browser through the
 public Open-Meteo API (`/v1/meteofrance` and `/v1/forecast`); the point cache
 lives in each user's `localStorage` (3 h slot, 1 h for the 15-min nowcast).
 Models differ in resolution and forecast window (2–5 days, displayed
-07:00–22:00) — the catalog is `MODELS` in `frontend/src/api/models.ts`.
+08:00–21:00) — the catalog is `MODELS` in `frontend/src/api/models.ts`.
 Several models only cover part of Europe: when Open-Meteo has no data for a
 point, the user gets an explicit "no data for this location — pick another
 model" message. Deployable as static files (`frontend/dist/`).

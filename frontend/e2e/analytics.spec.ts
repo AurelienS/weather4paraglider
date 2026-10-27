@@ -39,37 +39,22 @@ test("configured analytics sends one page view per page, not per selection", asy
   // the initial page view is queued and flushed once the script loads
   await expect.poll(() => pageViews(umami.events)).toEqual(["/place"]);
 
-  // navigating between pages sends one page view per page
-  await page.getByRole("button", { name: "Compare models" }).click();
-  await expect(page.locator(".board-card")).toHaveCount(1);
+  // the guide is the only other page; coming back is a page view too
   await page.getByRole("button", { name: "Guide", exact: true }).click();
   await expect(page.locator(".guide")).toBeVisible();
-  // entering compare places from the guide closes it and opens the board
-  await page.getByRole("button", { name: "Compare places" }).click();
-  await expect(page.locator(".board-card").first()).toBeVisible();
   await page.getByRole("button", { name: "Place", exact: true }).click();
-  await expect(page.locator(".board-list")).toHaveCount(0);
-  await expect
-    .poll(() => pageViews(umami.events))
-    .toEqual(["/place", "/compare/models", "/guide", "/compare/places", "/place"]);
+  await expect(page.locator(".wg").first()).toBeVisible();
+  await expect.poll(() => pageViews(umami.events)).toEqual(["/place", "/guide", "/place"]);
 
-  // selections that stay on the place page are not page views: no URL query
-  // churn in the Pages report, and no events either
-  await page.getByLabel("Model").selectOption("arpege_europe");
-  await expect(page.locator(".meta")).toContainText("arpege_europe");
-  await expect(page).toHaveURL(/model=arpege_europe/);
-  expect(await pageViews(umami.events)).toEqual([
-    "/place",
-    "/compare/models",
-    "/guide",
-    "/compare/places",
-    "/place",
-  ]);
+  // a model switch stays on the place page: no extra page view, one event
+  await page.locator(".model-plate").nth(1).click();
+  await expect(page.locator(".model-plate").nth(1)).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/model=icon_d2/);
+  expect(await pageViews(umami.events)).toEqual(["/place", "/guide", "/place"]);
 
-  // the model choice is a custom event carrying the model id
   const events = await umami.events();
   expect(events.filter((e) => e.type === "event")).toEqual([
-    { type: "event", name: "model_selected", data: { model: "arpege_europe" } },
+    { type: "event", name: "model_selected", data: { model: "icon_d2" } },
   ]);
   expect(om.calls()).toBeGreaterThan(0);
 });

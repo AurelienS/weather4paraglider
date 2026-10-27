@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -132,7 +133,7 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
     mapRef.current?.panTo(p);
   }
 
-  return (
+  return createPortal(
     <div
       className="map-overlay"
       role="dialog"
@@ -196,6 +197,7 @@ export function MapPicker({ lat, lon, model, onCancel, onPick }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

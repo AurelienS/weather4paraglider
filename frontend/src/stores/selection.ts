@@ -1,5 +1,6 @@
 
 import { groupByDay } from "../lib/format";
+import { shiftHourSelection } from "../lib/hours";
 import type { View } from "./types";
 import type { SliceCreator } from "./index";
 
@@ -19,6 +20,8 @@ export type SelectionSlice = {
   selectDay: (key: string) => void;
   /** Sounding hour select: resolve a time into data.hours index. */
   selectHourTime: (time: string) => void;
+  /** Sounding: one display hour forward (1) or back (-1), across days. */
+  stepHour: (delta: -1 | 1) => void;
 };
 
 export const createSelectionSlice: SliceCreator<SelectionSlice> = (set, get) => ({
@@ -45,5 +48,12 @@ export const createSelectionSlice: SliceCreator<SelectionSlice> = (set, get) => 
     if (!data) return;
     const idx = data.hours.findIndex((h) => h.time === time);
     if (idx >= 0) set({ hourIdx: idx });
+  },
+
+  stepHour: (delta) => {
+    const { data, day, hourIdx, lang } = get();
+    if (!data) return;
+    const next = shiftHourSelection(data.hours, day, hourIdx, delta, lang);
+    if (next) set(next);
   },
 });

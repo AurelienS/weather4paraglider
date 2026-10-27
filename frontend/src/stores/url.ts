@@ -171,6 +171,7 @@ export function writeStateToUrl(
   entries: CompareEntry[],
 ) {
   const url = new URL(window.location.href);
+  const keepGuide = url.searchParams.get("guide") === "1";
   const isHome =
     point.lat === DEMO_POINT.lat &&
     point.lon === DEMO_POINT.lon &&
@@ -184,6 +185,7 @@ export function writeStateToUrl(
     params.set("model", modelId);
   }
   if (compare) params.set("compare", compareMode === "model" ? "models" : "1");
+  if (keepGuide) params.set("guide", "1");
   let search = params.toString();
   if (compare && entries.length > 0) search += `&pins=${encodeBoard(entries)}`;
   url.search = search;

@@ -1,5 +1,4 @@
 import {
-  arrowEdge,
   arrowInk,
   cellBackground,
   cssRgb,
@@ -7,6 +6,7 @@ import {
   windRgb,
 } from "../lib/windgram";
 import { useI18n } from "../i18nContext";
+import { WindNeedle } from "./WindArrow";
 
 const REPO = "https://github.com/AurelienS/weather4paraglider";
 const ISSUE_BUG = `${REPO}/issues/new?labels=bug`;
@@ -96,7 +96,6 @@ function GramDemo() {
             const y = HEAD_H + r * CELL_H;
             const bg = cellBackground(c.w, c.cloud ?? null);
             const ink = arrowInk(windRgb(c.kmh), bg);
-            const edge = cssRgb(arrowEdge(bg));
             return (
               <g key={i}>
                 <rect
@@ -112,31 +111,7 @@ function GramDemo() {
                     c.dir + 180
                   } 8 8)`}
                 >
-                  <line
-                    x1="8"
-                    y1="14"
-                    x2="8"
-                    y2="4"
-                    stroke={edge}
-                    strokeWidth={6.2}
-                    strokeLinecap="round"
-                  />
-                  <line
-                    x1="8"
-                    y1="14"
-                    x2="8"
-                    y2="4"
-                    stroke={cssRgb(ink)}
-                    strokeWidth={3.2}
-                    strokeLinecap="round"
-                  />
-                  <polygon
-                    points="8,0.5 2.2,9 13.8,9"
-                    fill={cssRgb(ink)}
-                    stroke={edge}
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
+                  <WindNeedle cx={8} cy={8} scale={0.62} color={cssRgb(ink)} />
                 </g>
                 <text
                   x={x + CELL_W / 2 + 14}
@@ -214,9 +189,9 @@ function GramScale() {
         <span className="gs-bar" style={{ background: `linear-gradient(90deg, ${lift})` }} />
         <span className="gs-ticks">
           <span>0.5</span>
-          <span>1</span>
-          <span>2</span>
-          <span>3</span>
+          <span>1.2</span>
+          <span>2.2</span>
+          <span>3.5</span>
           <span>6</span>
         </span>
         <span className="gs-unit">m/s</span>

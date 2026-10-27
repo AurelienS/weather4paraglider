@@ -100,7 +100,7 @@ export type TimeWindow = {
 export function resolveWindow(nowMs: number = Date.now(), days = 3): TimeWindow {
   const startParts = parisParts(nowMs);
   // full days (00:00–23:00): the meteogram spans 24 h; the windgram and the
-  // sounding still narrow their own display to 07:00–22:00 downstream
+  // sounding still narrow their own display to 08:00–21:00 downstream
   const startPseudo = Date.UTC(startParts.y, startParts.m - 1, startParts.d, 0, 0);
   const start = startPseudo - parisOffsetMs(startPseudo);
   const endParts = parisParts(nowMs + (days - 1) * 86_400_000);

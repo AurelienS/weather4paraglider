@@ -48,15 +48,34 @@ describe("iso0CellZ", () => {
     expect(z).toBe(2750);
   });
 
-  it("colors a weak climb green and a rough one violet", () => {
-    const weak = thermalRgb(0.5);
-    const good = thermalRgb(2);
+  it("steps through teal, gold, vermilion and violet without blending them", () => {
+    const scratch = thermalRgb(0.8);
+    const climb = thermalRgb(1.8);
+    const strong = thermalRgb(3);
     const rough = thermalRgb(6);
-    expect(weak[1]).toBeGreaterThan(weak[0]);
-    expect(weak[1]).toBeGreaterThan(weak[2]);
-    expect(good[0]).toBeGreaterThan(good[2] + 80);
+    expect(scratch[1]).toBeGreaterThan(scratch[0] + 20);
+    expect(scratch[2]).toBeGreaterThan(scratch[0] + 15);
+    expect(climb[0]).toBeGreaterThan(climb[2] + 40);
+    expect(climb[1]).toBeGreaterThan(climb[2] + 40);
+    expect(strong[0]).toBeGreaterThan(strong[1] + 20);
+    expect(strong[1]).toBeGreaterThan(strong[2]);
     expect(rough[2]).toBeGreaterThan(rough[1]);
+    expect(rough[0]).toBeGreaterThan(rough[1]);
     expect(thermalRgb(9)).toEqual(rough);
+    const before = thermalRgb(1.19);
+    const after = thermalRgb(1.2);
+    expect(before[2]).toBeGreaterThan(before[0]);
+    expect(after[0]).toBeGreaterThan(after[2] + 30);
+  });
+
+  it("keeps a trace of lift almost white", () => {
+    expect(cellBackground(0, 0)).toEqual([255, 255, 255]);
+    const trace = cellBackground(0.1, 0);
+    const solid = cellBackground(0.5, 0);
+    for (const channel of trace) expect(channel).toBeGreaterThanOrEqual(248);
+    const span = (rgb: [number, number, number]) => Math.max(...rgb) - Math.min(...rgb);
+    expect(span(solid)).toBeGreaterThan(span(trace) + 8);
+    expect(trace[1]).toBeGreaterThan(trace[0]);
   });
 
   it("handles an empty grid", () => {
@@ -107,23 +126,22 @@ describe("arrowInk", () => {
     }
   });
 
-  it("darkens an orange arrow on an orange thermal and stays orange", () => {
+  it("darkens an orange arrow on a vermilion thermal and stays orange", () => {
     const wind = windRgb(32);
-    const bg = cellBackground(2.5, 0);
-    expect(colorDistance(wind, bg)).toBeLessThan(0.16);
+    const bg = cellBackground(3.2, 0);
     const ink = arrowInk(wind, bg);
-    expect(ink).not.toEqual(wind);
+    expect(colorDistance(ink, bg)).toBeGreaterThanOrEqual(0.16);
     expect(ink[0]).toBeGreaterThan(ink[1]);
     expect(ink[1]).toBeGreaterThan(ink[2]);
-    expect(ink[0]).toBeLessThan(wind[0]);
-    expect(ink[1]).toBeLessThan(wind[1]);
-    expect(ink[2]).toBeLessThanOrEqual(wind[2]);
+    if (colorDistance(wind, bg) < 0.16) {
+      expect(ink[0]).toBeLessThan(wind[0]);
+      expect(ink[1]).toBeLessThan(wind[1]);
+    }
   });
 
-  it("keeps a light-wind arrow green when the thermal is green", () => {
+  it("keeps a light-wind arrow green on a teal thermal", () => {
     const wind = windRgb(12);
     const ink = arrowInk(wind, cellBackground(1, 0));
-    expect(ink).not.toEqual(wind);
     expect(ink[1]).toBeGreaterThan(ink[0]);
     expect(ink[1]).toBeGreaterThan(ink[2]);
   });

@@ -34,7 +34,7 @@ function hour(time: string): Hour {
   };
 }
 
-/** Two display days (07:00–09:00 Paris time), day 1 and day 2. */
+/** Two display days (08:00–09:00 Paris time), day 1 and day 2. */
 function payload(): AromeResponse {
   return {
     model: "arome",
@@ -49,11 +49,10 @@ function payload(): AromeResponse {
     timezone: "Europe/Paris",
     fetchedAt: "2030-01-01T00:05:00Z",
     hours: [
-      hour(`${JAN_FIRST}T07:00:00+01:00`),
       hour(`${JAN_FIRST}T08:00:00+01:00`),
       hour(`${JAN_FIRST}T09:00:00+01:00`),
-      hour("2030-01-02T07:00:00+01:00"),
       hour("2030-01-02T08:00:00+01:00"),
+      hour("2030-01-02T09:00:00+01:00"),
     ],
     warnings: [],
     attribution: "test",

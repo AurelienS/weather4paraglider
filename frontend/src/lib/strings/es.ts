@@ -30,6 +30,8 @@ export const es: Dict = {
   meteoLblWind: "Viento",
   meteoLblGust: "Rachas",
   hourLabel: "Hora",
+  prevHour: "Hora anterior",
+  nextHour: "Hora siguiente",
   navAria: "Páginas principales",
   tabPlace: "Lugar",
   tabGuide: "Guía",
@@ -59,7 +61,9 @@ export const es: Dict = {
   noResults: "Sin resultados.",
   favorites: "Favoritos ({n})",
   favoritesEmpty: "Todavía no hay favoritos.",
-  favoritesEmptyHint: "Carga un lugar y pulsa «+ Favorito» para guardarlo aquí.",
+  favoritesEmptyHint: "Carga un lugar y pulsa la estrella para guardarlo aquí.",
+  railFavorites: "Favoritos",
+  recentEmpty: "Los lugares que abras aparecen aquí.",
   removeFavoriteAria: "Quitar {label} de los favoritos",
   alreadyInCompare: "Ya está en la comparación",
   mapOpen: "Mapa…",
@@ -121,7 +125,7 @@ export const es: Dict = {
   pinRun: "run {day} {slot} UTC",
   errNoData:
     "{model} no tiene datos para este lugar: este modelo cubre una zona más pequeña. " +
-    "Elige otro modelo en la barra de herramientas (AROME cubre toda Francia).",
+    "Elige el otro modelo en la columna (AROME cubre toda Francia).",
   errRateLimit:
     "Límite de Open-Meteo alcanzado para tu conexión. " +
     "La app consulta directamente este servicio gratuito; su cuota se cuenta " +
@@ -150,23 +154,20 @@ export const es: Dict = {
     "la base de las nubes.",
   guideModelsTitle: "¿Qué modelo debo usar?",
   guideModelsP1:
-    "AROME France 2,5 km es la referencia para Francia: cubre todo el país y " +
-    "encuentra un buen equilibrio entre detalle y fiabilidad. Usa AROME 15 min para las próximas " +
-    "horas, y ARPEGE Europe para mirar 4–5 días adelante.",
+    "AROME France 2,5 km es la referencia para Francia: cubre todo el país, llega a " +
+    "las capas de altura y mira unos tres días hacia delante.",
   guideModelsP2:
-    "AROME HD 1,3 km y MeteoSwiss ICON-CH1 1 km resuelven el terreno con mucho más " +
-    "detalle. No tienen capas altas, así que su windgram se detiene unos cientos de " +
-    "metros por encima de las cumbres — pero para lo que pasa cerca del suelo " +
-    "(despegue, cresta, brisa de valle) son los más precisos, y brillan en la costa, " +
-    "donde los modelos más gruesos alisan la brisa del mar.",
+    "ICON D2 2,2 km del DWD es la segunda lectura — Alemania, los Alpes y la mayor " +
+    "parte de Francia, unos dos días, con el mismo tipo de perfil vertical. Se cambia " +
+    "en la columna. Cuando discrepan, esa diferencia es la previsión.",
   guideLimitsTitle: "Cobertura geográfica",
   guideLimitsP1:
-    "Cada modelo cubre solo su zona: AROME Francia y vecinos, ICON-CH1 los Alpes " +
-    "alrededor de Suiza, ICON-D2 Alemania y los Alpes, HARMONIE el norte y centro de " +
-    "Europa. Open-Meteo simplemente no tiene datos fuera de la rejilla de un modelo.",
+    "AROME cubre Francia y sus vecinos. ICON D2 cubre Alemania, los Alpes y la mayor " +
+    "parte de Francia, pero no el extremo sudeste de la costa. Open-Meteo no tiene " +
+    "datos fuera de la rejilla de un modelo.",
   guideLimitsP2:
     "Cuando tu punto está fuera, la app te lo dice en lugar de mostrar silenciosamente " +
-    "una celda vecina — solo elige otro modelo en la barra de herramientas.",
+    "una celda vecina — elige el otro modelo en la columna.",
   guideQuotaTitle: "La cuota de Open-Meteo",
   guideQuotaP1:
     "La app habla directamente con Open-Meteo, un servicio gratuito; no hay servidor " +
@@ -174,8 +175,8 @@ export const es: Dict = {
     "activa puede alcanzar el límite — se renueva solo al cabo de unos minutos.",
   guideQuotaP2:
     "Los resultados se guardan en la caché de tu navegador (franja de 3 h, 1 h para " +
-    "la previsión inmediata): navegar por días, altitudes o el panel de comparación " +
-    "no cuesta nada. El botón Actualizar es la única acción que fuerza una llamada " +
+    "la previsión inmediata): navegar por días u horas no cuesta nada. El botón " +
+    "Actualizar es la única acción que fuerza una llamada " +
     "real.",
   guideGramTitle: "Leer el windgram",
   guideGramP1:
@@ -186,9 +187,10 @@ export const es: Dict = {
     "pequeño rojo ladrillo bajo la velocidad es la racha, mostrada solo cuando " +
     "añade 5 km/h o más.",
   guideGramP2:
-    "El fondo de la celda es la térmica, en una escala de parapente: verde, una " +
-    "ascendencia floja; amarillo, un buen día; rojo, una fuerte; violeta, un día " +
-    "duro. Un velo gris señala las nubes. Pasa el ratón por " +
+    "El fondo de la celda es la térmica, en una escala de parapente: el verde " +
+    "azulado queda bajo el hundimiento del ala, el oro es un ascenso, el bermellón " +
+    "uno fuerte y el violeta un día duro. Dentro de un color solo cambia la " +
+    "intensidad. Un velo gris señala las nubes. Pasa el ratón por " +
     "una celda para leer la temperatura, el ascenso en m/s y la cobertura nubosa. " +
     "Esa velocidad es la subida media de una térmica seca, antes del hundimiento " +
     "del ala — un cúmulo encima puede añadir más, y un viento que arrecia con la " +
@@ -220,14 +222,13 @@ export const es: Dict = {
     "el punto de rocío exactos a cada altitud; el perfil del viento se dibuja a la derecha.",
   guideWhyTitle: "¿Por qué esta app?",
   guideWhyModels:
-    "Solo modelos serios: AROME, ARPEGE, ICON-CH1 de MeteoSwiss, ICON-D2 del DWD, " +
-    "HARMONIE del DMI — mantenidos por servicios meteorológicos nacionales con " +
-    "medios de verdad, y eliges el que encaja con tu spot.",
+    "Dos modelos serios: AROME 2,5 km de Météo-France e ICON D2 del DWD, ambos con " +
+    "las capas de altura que vuela un parapente. Un clic cambia de uno a otro.",
   guideWhyFree:
     "Completamente gratis, sin cuenta, sin anuncios: toda la app corre en tu navegador.",
   guideWhyCompare:
-    "Varios lugares lado a lado en la misma página: fija el despegue, el aterrizaje " +
-    "y el valle de al lado y compáralos hora a hora.",
+    "Los favoritos y los lugares recientes se quedan a la vista: un clic y el " +
+    "gráfico te sigue del despegue al aterrizaje.",
   guideWhyRuns:
     "Siempre la última pasada de cada modelo, tan pronto la publica Open-Meteo — " +
     "a diferencia de algunas webs de pago que suelen mostrar una sola pasada al día.",
@@ -235,8 +236,8 @@ export const es: Dict = {
   guideDataP1:
     "Weather4Paragliding no tiene servidor propio: tu navegador llama directamente " +
     "a la API de Open-Meteo, un servicio gratuito que redistribuye la salida bruta " +
-    "de los modelos nacionales (AROME y ARPEGE de Météo-France, ICON-CH1 de " +
-    "MeteoSwiss, ICON-D2 del DWD, HARMONIE del DMI).",
+    "de los modelos nacionales. Esta app lee AROME 2,5 km de Météo-France e " +
+    "ICON D2 del DWD.",
   guideDataP2:
     "Recuerda qué es una previsión: la salida de una pasada de modelo, no una " +
     "observación. Un valor puntual es la celda de rejilla más cercana: una cresta " +

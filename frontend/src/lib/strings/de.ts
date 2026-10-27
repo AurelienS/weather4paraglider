@@ -30,6 +30,8 @@ export const de: Dict = {
   meteoLblWind: "Wind",
   meteoLblGust: "Böen",
   hourLabel: "Uhrzeit",
+  prevHour: "Vorherige Stunde",
+  nextHour: "Nächste Stunde",
   navAria: "Hauptseiten",
   tabPlace: "Ort",
   tabGuide: "Guide",
@@ -59,7 +61,9 @@ export const de: Dict = {
   noResults: "Keine Ergebnisse.",
   favorites: "Favoriten ({n})",
   favoritesEmpty: "Noch keine Favoriten.",
-  favoritesEmptyHint: "Ort laden, dann „+ Favorit“ drücken, um ihn hier zu behalten.",
+  favoritesEmptyHint: "Ort laden, dann den Stern drücken, um ihn hier zu behalten.",
+  railFavorites: "Favoriten",
+  recentEmpty: "Geöffnete Orte erscheinen hier.",
   removeFavoriteAria: "{label} aus den Favoriten entfernen",
   alreadyInCompare: "Schon im Vergleich",
   mapOpen: "Karte…",
@@ -121,7 +125,7 @@ export const de: Dict = {
   pinRun: "Run {day} {slot} UTC",
   errNoData:
     "{model} hat keine Daten für diesen Ort: Dieses Modell deckt ein kleineres " +
-    "Gebiet ab. Wähle ein anderes Modell in der Werkzeugleiste (AROME deckt ganz " +
+    "Gebiet ab. Wähle das andere Modell in der Spalte (AROME deckt ganz " +
     "Frankreich ab).",
   errRateLimit:
     "Open-Meteo-Limit für deine Verbindung erreicht. " +
@@ -152,24 +156,20 @@ export const de: Dict = {
     "einen Blick erkennbar.",
   guideModelsTitle: "Welches Modell soll ich nutzen?",
   guideModelsP1:
-    "AROME France 2,5 km ist die Referenz für Frankreich: Es deckt das ganze Land ab " +
-    "und hält Detail und Zuverlässigkeit gut in Balance. Nimm AROME 15 min für die " +
-    "nächsten Stunden und ARPEGE Europe für den Blick auf 4–5 Tage.",
+    "AROME France 2,5 km ist die Referenz für Frankreich: Es deckt das ganze Land ab, " +
+    "reicht in die Höhenlagen und blickt etwa drei Tage voraus.",
   guideModelsP2:
-    "AROME HD 1,3 km und MeteoSwiss ICON-CH1 1 km lösen das Gelände viel feiner auf. " +
-    "Sie haben keine Hochlagen, ihr Windgram endet also ein paar Hundert Meter über " +
-    "den Gipfeln — aber für das, was bodennah passiert (Startplatz, Grat, Talwind), " +
-    "sind sie am präzisesten, und an der Küste sind sie unschlagbar, wo gröbere " +
-    "Modelle die Seebrise glätten.",
+    "ICON D2 2,2 km vom DWD ist die zweite Lesart — Deutschland, die Alpen und der " +
+    "größte Teil Frankreichs, über etwa zwei Tage, mit demselben vertikalen Profil. " +
+    "Der Wechsel sitzt in der Spalte. Wo sie sich widersprechen, ist das die Vorhersage.",
   guideLimitsTitle: "Geografische Abdeckung",
   guideLimitsP1:
-    "Jedes Modell deckt nur sein eigenes Gebiet ab: AROME Frankreich und Nachbarn, " +
-    "ICON-CH1 die Alpen rund um die Schweiz, ICON-D2 Deutschland und die Alpen, " +
-    "HARMONIE Nord- und Mitteleuropa. Open-Meteo hat außerhalb des Modellgitters " +
-    "schlicht keine Daten.",
+    "AROME deckt Frankreich und die Nachbarn ab. ICON D2 deckt Deutschland, die Alpen " +
+    "und den größten Teil Frankreichs ab, nicht aber die äußerste Südostküste. " +
+    "Außerhalb des Modellgitters hat Open-Meteo keine Daten.",
   guideLimitsP2:
     "Liegt dein Punkt außerhalb, sagt die App es dir, statt stillschweigend eine " +
-    "Nachbarzelle zu zeigen — wähle einfach ein anderes Modell in der Werkzeugleiste.",
+    "Nachbarzelle zu zeigen — wähle das andere Modell in der Spalte.",
   guideQuotaTitle: "Das Open-Meteo-Kontingent",
   guideQuotaP1:
     "Die App spricht direkt mit Open-Meteo, einem kostenlosen Dienst; es gibt keinen " +
@@ -178,8 +178,8 @@ export const de: Dict = {
     "ein paar Minuten von selbst.",
   guideQuotaP2:
     "Ergebnisse werden im Browser gepuffert (3-h-Fenster, 1 h für die " +
-    "Jetztvorhersage): Das Blättern durch Tage, Höhen oder die Vergleichstafel " +
-    "kostet nichts. Der Aktualisieren-Knopf ist die einzige Aktion, die einen " +
+    "Jetztvorhersage): Das Blättern durch Tage oder Stunden kostet nichts. Der " +
+    "Aktualisieren-Knopf ist die einzige Aktion, die einen " +
     "echten Aufruf erzwingt.",
   guideGramTitle: "Das Windgram lesen",
   guideGramP1:
@@ -190,9 +190,10 @@ export const de: Dict = {
     "ziegelrote Zahl unter der Geschwindigkeit ist die Bö, angezeigt nur wenn sie " +
     "5 km/h oder mehr hinzufügt.",
   guideGramP2:
-    "Der Zellhintergrund ist die Thermik, auf einer Gleitschirm-Skala: Grün ist " +
-    "ein schwaches Steigen, Gelb ein gutes, Rot ein starkes und Violett ein rauer " +
-    "Tag. Ein grauer Schleier bedeutet Wolken. Fahre über eine " +
+    "Der Zellhintergrund ist die Thermik, auf einer Gleitschirm-Skala: Petrol " +
+    "liegt unter dem Eigensinken, Gold ist ein Steigen, Zinnober ein starkes und " +
+    "Violett ein rauer Tag. Innerhalb einer Farbe ändert sich nur die Stärke. " +
+    "Ein grauer Schleier bedeutet Wolken. Fahre über eine " +
     "Zelle, um Temperatur, Steigen in m/s und Bewölkung zu lesen. Diese Geschwindigkeit " +
     "ist der mittlere Steigwert eines trockenen Thermals, vor dem Eigensinken des " +
     "Schirms — eine Wolke darüber kann mehr bringen, und ein Wind, der mit der Höhe " +
@@ -223,14 +224,13 @@ export const de: Dict = {
     "exakt auf jeder Höhe zu lesen; das Windprofil steht rechts.",
   guideWhyTitle: "Warum diese App?",
   guideWhyModels:
-    "Nur ernsthafte Modelle: AROME, ARPEGE, ICON-CH1 von MeteoSwiss, ICON-D2 vom " +
-    "DWD, HARMONIE vom DMI — gepflegt von nationalen Wetterdiensten mit echten " +
-    "Mitteln, und du wählst dasjenige, das zu deinem Spot passt.",
+    "Zwei ernsthafte Modelle: AROME 2,5 km von Météo-France und ICON D2 vom DWD, " +
+    "beide mit den Höhenlagen, die ein Gleitschirm fliegt. Ein Klick wechselt.",
   guideWhyFree:
     "Völlig kostenlos, ohne Konto, ohne Werbung: die ganze App läuft in deinem Browser.",
   guideWhyCompare:
-    "Mehrere Orte nebeneinander auf derselben Seite: pinne Startplatz, Landeplatz " +
-    "und das Tal daneben und vergleiche sie Stunde für Stunde.",
+    "Favoriten und zuletzt geöffnete Orte bleiben sichtbar: ein Klick, und das " +
+    "Diagramm folgt dir vom Startplatz zum Landeplatz.",
   guideWhyRuns:
     "Immer der neueste Lauf jedes Modells, sobald Open-Meteo ihn veröffentlicht — " +
     "anders als manche Bezahlseiten, die oft nur einen Lauf pro Tag zeigen.",
@@ -238,8 +238,8 @@ export const de: Dict = {
   guideDataP1:
     "Weather4Paragliding hat keinen eigenen Server: dein Browser ruft direkt die " +
     "Open-Meteo-API auf, ein kostenloser Dienst, der die Rohausgabe der " +
-    "Nationalmodelle weitergibt (AROME und ARPEGE von Météo-France, ICON-CH1 von " +
-    "MeteoSwiss, ICON-D2 vom DWD, HARMONIE vom DMI).",
+    "Nationalmodelle weitergibt. Diese App liest AROME 2,5 km von Météo-France " +
+    "und ICON D2 vom DWD.",
   guideDataP2:
     "Behalte im Kopf, was eine Vorhersage ist: das Ergebnis eines Modelllaufs, " +
     "keine Beobachtung. Ein Punktwert ist die nächstgelegene Rasterzelle — eine " +
