@@ -1,4 +1,11 @@
-import { cssRgb, THERMAL_STOPS, thermalRgb, windRgb, type RGB } from "../lib/windgram";
+import {
+  arrowEdge,
+  arrowInk,
+  cellBackground,
+  cssRgb,
+  THERMAL_STOPS,
+  windRgb,
+} from "../lib/windgram";
 import { useI18n } from "../i18nContext";
 
 const REPO = "https://github.com/AurelienS/weather4paraglider";
@@ -9,20 +16,6 @@ const ISSUE_FEATURE = `${REPO}/issues/new?labels=enhancement`;
  * veiled gray by clouds), wind-colored arrow, ink speed number and a small
  * brick-red gust number below it. */
 type DemoCell = { kmh: number; gust: number; dir: number; w: number; cloud?: number };
-
-function demoCellBg(cell: DemoCell): string {
-  let rgb: RGB = [255, 255, 255];
-  if (cell.w > 0.05) rgb = thermalRgb(cell.w);
-  if (cell.cloud != null && cell.cloud >= 10) {
-    const fog = 0.14 + 0.36 * ((cell.cloud - 10) / 90);
-    rgb = [
-      Math.round(rgb[0] + (148 - rgb[0]) * fog),
-      Math.round(rgb[1] + (150 - rgb[1]) * fog),
-      Math.round(rgb[2] + (154 - rgb[2]) * fog),
-    ];
-  }
-  return cssRgb(rgb);
-}
 
 const DEMO_HOURS = ["10h", "11h", "12h", "13h", "14h"];
 
@@ -101,6 +94,9 @@ function GramDemo() {
           {row.cells.map((c, i) => {
             const x = LABEL_W + i * CELL_W;
             const y = HEAD_H + r * CELL_H;
+            const bg = cellBackground(c.w, c.cloud ?? null);
+            const ink = arrowInk(windRgb(c.kmh), bg);
+            const edge = cssRgb(arrowEdge(bg));
             return (
               <g key={i}>
                 <rect
@@ -109,7 +105,7 @@ function GramDemo() {
                   width={CELL_W - 3}
                   height={CELL_H - 3}
                   rx={3}
-                  fill={demoCellBg(c)}
+                  fill={cssRgb(bg)}
                 />
                 <g
                   transform={`translate(${x + 12} ${y + CELL_H / 2 - 12}) rotate(${
@@ -121,13 +117,25 @@ function GramDemo() {
                     y1="14"
                     x2="8"
                     y2="4"
-                    stroke={cssRgb(windRgb(c.kmh))}
+                    stroke={edge}
+                    strokeWidth={6.2}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1="8"
+                    y1="14"
+                    x2="8"
+                    y2="4"
+                    stroke={cssRgb(ink)}
                     strokeWidth={3.2}
                     strokeLinecap="round"
                   />
                   <polygon
                     points="8,0.5 2.2,9 13.8,9"
-                    fill={cssRgb(windRgb(c.kmh))}
+                    fill={cssRgb(ink)}
+                    stroke={edge}
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
                   />
                 </g>
                 <text

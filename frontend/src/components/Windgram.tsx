@@ -5,12 +5,16 @@ import {
   altitudeLevels,
   convectiveTop,
   cssRgb,
+  groundTintZ,
   iso0CellZ,
   sampleCell,
   windRgb,
   cellBackground,
+  arrowInk,
+  arrowEdge,
   type GramCell,
 } from "../lib/windgram";
+import { thermalSpeed } from "../lib/convection";
 import { WindArrow } from "./WindArrow";
 import { useI18n } from "../i18nContext";
 import { interpolate, type Dict } from "../lib/i18n";
@@ -200,6 +204,8 @@ function solCell(hour: Hour, elevationM: number, cblTop: number | null): GramCel
   const cell = sampleCell(hour, elevationM, elevationM, cblTop);
   return {
     ...cell,
+    // Zero exactly at the surface. Tint the band up to the next altitude line.
+    wMs: thermalSpeed(hour, groundTintZ(elevationM), elevationM, cblTop),
     wind: hour.surface.wind10,
     gust: hour.surface.gust10,
     dir: hour.surface.dir10,
@@ -252,7 +258,7 @@ function WindCell({
   if (!cell || cell.belowTerrain) {
     return <td className="rock" />;
   }
-  const color = cell.wind == null ? "#8a8a8a" : cssRgb(windRgb(cell.wind));
+  const bg = cellBackground(cell.wMs, cell.cloud);
   const gust =
     cell.wind != null && cell.gust != null && cell.gust >= cell.wind + 5
       ? cell.gust
@@ -261,16 +267,19 @@ function WindCell({
   return (
     <td
       className={`cell${iso0 ? " iso0" : ""}${gust != null ? " has-gust" : ""}`}
-      style={{
-        background: cssRgb(cellBackground(cell.wMs, cell.cloud)),
-      }}
+      style={{ background: cssRgb(bg) }}
       onMouseEnter={(e) => onTip(text, e)}
       onMouseMove={(e) => onTip(text, e)}
       onMouseLeave={() => onTip(null)}
     >
       <span className="in">
         {cell.dir != null && cell.wind != null ? (
-          <WindArrow dir={cell.dir} speed={cell.wind} color={color} />
+          <WindArrow
+            dir={cell.dir}
+            speed={cell.wind}
+            color={cssRgb(arrowInk(windRgb(cell.wind), bg))}
+            edge={cssRgb(arrowEdge(bg))}
+          />
         ) : null}
         <span className="n">
           <b>{cell.wind ?? ""}</b>

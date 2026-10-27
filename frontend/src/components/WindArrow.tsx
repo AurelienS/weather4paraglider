@@ -1,14 +1,17 @@
 type Props = {
   dir: number;
   speed: number;
+  /** Wind ink, already adjusted so it clears the cell background. */
   color: string;
+  /** Neutral rim that separates the shaft from the cell. */
+  edge: string;
 };
 
-export function WindArrow({ dir, speed, color }: Props) {
+export function WindArrow({ dir, speed, color, edge }: Props) {
   if (speed < 1.5) {
     return (
       <svg className="warrow" viewBox="0 0 32 32" aria-hidden>
-        <circle cx="16" cy="16" r="3.4" fill={color} stroke="#241c14" strokeWidth="1.1" />
+        <circle cx="16" cy="16" r="3.4" fill={color} stroke={edge} strokeWidth="1.5" />
       </svg>
     );
   }
@@ -22,8 +25,8 @@ export function WindArrow({ dir, speed, color }: Props) {
           y1="28"
           x2="16"
           y2="9"
-          stroke="#241c14"
-          strokeWidth={w + 2.2}
+          stroke={edge}
+          strokeWidth={w + 3}
           strokeLinecap="round"
         />
         <line
@@ -38,8 +41,8 @@ export function WindArrow({ dir, speed, color }: Props) {
         <polygon
           points="16,3 7.5,15 24.5,15"
           fill={color}
-          stroke="#241c14"
-          strokeWidth="1.3"
+          stroke={edge}
+          strokeWidth="1.7"
           strokeLinejoin="round"
         />
       </g>

@@ -63,6 +63,17 @@ export function altitudeLevels(elevM: number, zMax: number, step = ALT_STEP_M): 
 }
 
 /**
+ * Altitude used to color the ground row. The updraft profile is zero right
+ * on the surface, and the next grid line sits up to one step above the
+ * ground, so the row shows the climb in the middle of that band.
+ */
+export function groundTintZ(elevM: number, step = ALT_STEP_M): number {
+  const line = altitudeLevels(elevM, elevM + step + 15, step)[0];
+  if (line == null) return elevM;
+  return (elevM + line) / 2;
+}
+
+/**
  * AMSL altitude of the row carrying the 0 °C isotherm line: the row just
  * BELOW the lowest sub-zero cell, so the line sits on the shared edge
  * between the sub-zero cell and the above-zero cell under it.
@@ -146,6 +157,140 @@ export function cellBackground(wMs: number, cloud: number | null): RGB {
 
 export function cssRgb(rgb: RGB): string {
   return `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]})`;
+}
+
+/**
+ * Minimum OKLab distance between the arrow and the cell. Luminance contrast
+ * is the wrong test here: a green arrow on an orange thermal is obvious, while
+ * an orange arrow on an orange thermal is not. 0.16 is enough for the hue to
+ * read as its own color. Below that, the arrow is darkened along its hue.
+ */
+const ARROW_MIN_DISTANCE = 0.16;
+const EDGE_LIGHT: RGB = [255, 252, 246];
+const EDGE_DARK: RGB = [36, 28, 20];
+
+/** Perceptual distance in OKLab. 0 = the same color. */
+export function colorDistance(a: RGB, b: RGB): number {
+  const [l1, a1, b1] = rgbToOklab(a);
+  const [l2, a2, b2] = rgbToOklab(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+/**
+ * Arrow ink for one cell. The legend color is kept when it already stands
+ * off the background. A same-family collision (green on green, orange on
+ * orange) is darkened along that hue until the arrow reads on its own,
+ * so the color still means the same wind speed.
+ */
+export function arrowInk(wind: RGB, background: RGB): RGB {
+  if (colorDistance(wind, background) >= ARROW_MIN_DISTANCE) return wind;
+  const [h, s, l0] = rgbToHsl(wind);
+  return (
+    walkLightness(h, s, l0, background, -1) ??
+    walkLightness(h, s, l0, background, 1) ??
+    (contrastRatio(EDGE_DARK, background) >= contrastRatio(EDGE_LIGHT, background)
+      ? EDGE_DARK
+      : EDGE_LIGHT)
+  );
+}
+
+/**
+ * Rim around the arrow. The neutral (near-black or near-white) that stands
+ * off the cell the most, so the shaft stays a distinct shape.
+ */
+export function arrowEdge(background: RGB): RGB {
+  return contrastRatio(EDGE_DARK, background) >= contrastRatio(EDGE_LIGHT, background)
+    ? EDGE_DARK
+    : EDGE_LIGHT;
+}
+
+function contrastRatio(a: RGB, b: RGB): number {
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const hi = l1 > l2 ? l1 : l2;
+  const lo = l1 > l2 ? l2 : l1;
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function relativeLuminance(rgb: RGB): number {
+  return 0.2126 * linearSrgb(rgb[0]) + 0.7152 * linearSrgb(rgb[1]) + 0.0722 * linearSrgb(rgb[2]);
+}
+
+function linearSrgb(channel: number): number {
+  const s = channel / 255;
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+}
+
+/** Björn Ottosson's OKLab. L is lightness, a is green–red, b is blue–yellow. */
+function rgbToOklab(rgb: RGB): [number, number, number] {
+  const r = linearSrgb(rgb[0]);
+  const g = linearSrgb(rgb[1]);
+  const b = linearSrgb(rgb[2]);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+function walkLightness(
+  h: number,
+  s: number,
+  l0: number,
+  background: RGB,
+  dir: -1 | 1,
+): RGB | null {
+  const limit = dir < 0 ? 0.12 : 0.9;
+  for (let i = 1; i <= 48; i++) {
+    const next = l0 + dir * i * 0.02;
+    if (dir < 0 ? next < limit : next > limit) break;
+    const candidate = hslToRgb(h, s, next);
+    if (colorDistance(candidate, background) >= ARROW_MIN_DISTANCE) return candidate;
+  }
+  return null;
+}
+
+function rgbToHsl(rgb: RGB): [number, number, number] {
+  const r = rgb[0] / 255;
+  const g = rgb[1] / 255;
+  const b = rgb[2] / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): RGB {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const channel = (t0: number) => {
+    let t = t0;
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return [
+    Math.round(channel(h + 1 / 3) * 255),
+    Math.round(channel(h) * 255),
+    Math.round(channel(h - 1 / 3) * 255),
+  ];
 }
 
 /**

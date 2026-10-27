@@ -96,6 +96,84 @@ test("the getting-started guide explains models, coverage and quota", async ({ p
   await expect(page).not.toHaveURL(/guide=1/);
 });
 
+function parseRgb(color: string): [number, number, number] {
+  const nums = color.match(/[\d.]+/g);
+  if (!nums || nums.length < 3) throw new Error(`unparsed color ${color}`);
+  const r = Number(nums[0]);
+  const g = Number(nums[1]);
+  const b = Number(nums[2]);
+  return [r, g, b];
+}
+
+/** OKLab distance. Same threshold as ARROW_MIN_DISTANCE in src/lib/windgram.ts. */
+function colorDistance(a: [number, number, number], b: [number, number, number]): number {
+  const linear = (channel: number) => {
+    const s = channel / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const oklab = (rgb: [number, number, number]) => {
+    const r = linear(rgb[0]);
+    const g = linear(rgb[1]);
+    const bl = linear(rgb[2]);
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl);
+    return [
+      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+    ] as const;
+  };
+  const [l1, a1, b1] = oklab(a);
+  const [l2, a2, b2] = oklab(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+test("wind arrows stay readable on the thermal background", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell .warrow").first()).toBeVisible();
+
+  const gram = await page.locator(".wg").first().evaluate((root) => {
+    const out: { bg: string; ink: string }[] = [];
+    for (const cell of root.querySelectorAll("td.cell")) {
+      const arrow = cell.querySelector(".warrow");
+      if (!arrow) continue;
+      const lines = arrow.querySelectorAll("line");
+      const ink =
+        lines.length >= 2
+          ? lines[1]?.getAttribute("stroke")
+          : arrow.querySelector("circle")?.getAttribute("fill");
+      const bg = getComputedStyle(cell).backgroundColor;
+      if (ink) out.push({ bg, ink });
+    }
+    return out;
+  });
+  expect(gram.length).toBeGreaterThan(20);
+  for (const pair of gram) {
+    expect(colorDistance(parseRgb(pair.bg), parseRgb(pair.ink))).toBeGreaterThanOrEqual(0.16);
+  }
+
+  await page.getByRole("button", { name: "Guide", exact: true }).click();
+  await expect(page.locator(".gram-demo")).toBeVisible();
+  const demo = await page.locator(".gram-demo").evaluate((svg) => {
+    const out: { bg: string; ink: string }[] = [];
+    for (const cell of svg.querySelectorAll("g")) {
+      const rect = cell.querySelector(":scope > rect");
+      const lines = cell.querySelectorAll(":scope > g > line");
+      if (!rect || lines.length < 2) continue;
+      const bg = rect.getAttribute("fill");
+      const ink = lines[1]?.getAttribute("stroke");
+      if (bg && ink) out.push({ bg, ink });
+    }
+    return out;
+  });
+  expect(demo.length).toBe(15);
+  for (const pair of demo) {
+    expect(colorDistance(parseRgb(pair.bg), parseRgb(pair.ink))).toBeGreaterThanOrEqual(0.16);
+  }
+});
+
 test("renders the AROME windgram for the URL point", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
@@ -428,6 +506,29 @@ test("0 °C isotherm sits between the sub-zero and above-zero cells", async ({ p
   const coldRow = page.locator('.wg tbody tr:has(th:text-is("2500"))');
   await expect(warmRow.locator("td.cell").first()).toHaveClass(/iso0/);
   await expect(coldRow.locator("td.cell").first()).not.toHaveClass(/iso0/);
+});
+
+test("the thermal tint on the windgram starts at the ground row", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  const sol = page.locator('.wg tbody tr:has(th:text-is("sol 1696"))');
+  const midday = sol.locator("td").nth(6);
+  const night = sol.locator("td").nth(14);
+  await expect(midday).toBeVisible();
+  const [middayBg, nightBg] = await Promise.all([
+    midday.evaluate((el) => getComputedStyle(el).backgroundColor),
+    night.evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  const day = parseRgb(middayBg);
+  const dusk = parseRgb(nightBg);
+  // Midday ground is a green thermal. At night the row stays a neutral veil.
+  expect(day[1]).toBeGreaterThan(day[0]);
+  expect(day[1] - day[2]).toBeGreaterThan(20);
+  expect(Math.abs(dusk[0] - dusk[1])).toBeLessThan(8);
+  await midday.hover();
+  await expect(page.locator(".wg-cursor-tip")).toContainText("m/s");
+  await night.hover();
+  await expect(page.locator(".wg-cursor-tip")).not.toContainText("m/s");
 });
 
 test("windgram tooltip shows the thermal updraft at midday and not at night", async ({ page }) => {
