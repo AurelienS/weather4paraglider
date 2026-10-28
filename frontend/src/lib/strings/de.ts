@@ -24,6 +24,14 @@ export const de: Dict = {
   viewWindgram: "Windgram",
   viewSounding: "Sounding",
   viewMeteogram: "Meteogramm",
+  seeHigher: "Höher sehen",
+  seeHigherBack: "Zurück auf 5 km",
+  hoursEarly: "Vor 8 Uhr",
+  hoursEarlyBack: "Ab 8 Uhr",
+  hoursEarlyShort: "vor",
+  hoursLate: "Nach 20 Uhr",
+  hoursLateBack: "Bis 20 Uhr",
+  hoursLateShort: "nach",
   meteoLblCloud: "Wolken",
   meteoLblCbl: "Konvektion",
   meteoLblTd: "Taupunkt",
@@ -198,7 +206,10 @@ export const de: Dict = {
     "ist der mittlere Steigwert eines trockenen Thermals, vor dem Eigensinken des " +
     "Schirms — eine Wolke darüber kann mehr bringen, und ein Wind, der mit der Höhe " +
     "stark zunimmt, kann den Thermal zerreißen. Folge der blauen Linie über dem Raster " +
-    "— der 0-°C-Isotherme — um die Frostgrenze zu verfolgen.",
+    "— der 0-°C-Isotherme — um die Frostgrenze zu verfolgen. Das Raster endet bei " +
+    "5 km. Liegt darüber Wolke, öffnet Höher sehen die Zeilen bis 10 km, wo Wolken " +
+    "einen Flug noch beeinflussen können, und schließt sie wieder. Die Stunden gehen von 8 bis 20 Uhr. " +
+    "Vor 8 Uhr und Nach 20 Uhr öffnen den Rest des Tages und schließen ihn wieder.",
     demoSpeed: "Windgeschwindigkeit, km/h",
   demoGust: "Bö (nur wenn sie 5 km/h oder mehr hinzufügt)",
   demoArrow: "Strömungsrichtung",
@@ -221,7 +232,9 @@ export const de: Dict = {
   guideSoundP3:
     "Wo sich die orange und die blaue Kurve nähern, ist die Luft fast gesättigt: " +
     "das ist die Wolkenbasis. Fahr über das Diagramm, um Temperatur und Taupunkt " +
-    "exakt auf jeder Höhe zu lesen; das Windprofil steht rechts.",
+    "exakt auf jeder Höhe zu lesen; das Windprofil steht rechts, und jeder gemessene " +
+    "Punkt zeigt, wohin die Luft zieht. Die Stundenlinie " +
+    "unter dem Diagramm springt direkt zu einer Stunde.",
   guideWhyTitle: "Warum diese App?",
   guideWhyModels:
     "Zwei ernsthafte Modelle: AROME 2,5 km von Météo-France und ICON D2 vom DWD, " +

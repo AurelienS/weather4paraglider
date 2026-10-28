@@ -1,4 +1,4 @@
-import { groupByDay } from "./format";
+import { groupByDay, type HourWindow, CORE_HOUR_WINDOW } from "./format";
 import type { Lang } from "./i18n";
 
 export type HourStep = { day: string; hourIdx: number };
@@ -12,8 +12,9 @@ export function shiftHourSelection(
   hourIdx: number,
   delta: -1 | 1,
   lang: Lang = "en",
+  window: HourWindow = CORE_HOUR_WINDOW,
 ): HourStep | null {
-  const days = groupByDay(hours, lang);
+  const days = groupByDay(hours, lang, window);
   if (days.length === 0) return null;
   const activeKey = day && days.some((d) => d.key === day) ? day : days[0]!.key;
   const dayIndex = days.findIndex((d) => d.key === activeKey);

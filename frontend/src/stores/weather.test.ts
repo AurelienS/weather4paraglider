@@ -75,6 +75,8 @@ beforeEach(() => {
     hourIdx: 0,
     activeZ: null,
     view: "windgram",
+    showEarly: false,
+    showLate: false,
     compare: false,
     entries: [],
     entryStates: {},
@@ -143,6 +145,50 @@ describe("weather.loadMain", () => {
     const s = useStore.getState();
     expect(s.day).toBe(JAN_FIRST);
     expect(s.hourIdx).toBe(0);
+  });
+
+  test("carry keeps 06:00 only while the morning is open", async () => {
+    const early = payload();
+    early.hours = [
+      hour(`${JAN_FIRST}T06:00:00+01:00`),
+      hour(`${JAN_FIRST}T08:00:00+01:00`),
+      hour(`${JAN_FIRST}T20:00:00+01:00`),
+      hour(`${JAN_FIRST}T22:00:00+01:00`),
+    ];
+    fetchAromeMock.mockResolvedValue(early);
+    useStore.setState({ data: early, day: JAN_FIRST, hourIdx: 0, showEarly: true });
+    useStore.getState().loadMain({ carry: true });
+    await flush();
+    expect(useStore.getState().hourIdx).toBe(0);
+
+    useStore.setState({ data: early, day: JAN_FIRST, hourIdx: 0, showEarly: false });
+    useStore.getState().loadMain({ carry: true });
+    await flush();
+    expect(useStore.getState().hourIdx).toBe(1);
+  });
+
+  test("closing the evening snaps 22:00 back to 20:00; the sounding can still step on", () => {
+    const day = payload();
+    day.hours = [
+      hour(`${JAN_FIRST}T08:00:00+01:00`),
+      hour(`${JAN_FIRST}T20:00:00+01:00`),
+      hour(`${JAN_FIRST}T21:00:00+01:00`),
+      hour(`${JAN_FIRST}T22:00:00+01:00`),
+      hour("2030-01-02T08:00:00+01:00"),
+    ];
+    useStore.setState({ data: day, day: JAN_FIRST, hourIdx: 3, showLate: true });
+    useStore.getState().setShowLate(false);
+    expect(useStore.getState().showLate).toBe(false);
+    expect(useStore.getState().hourIdx).toBe(1);
+
+    useStore.getState().stepHour(1);
+    expect(useStore.getState().day).toBe(JAN_FIRST);
+    expect(useStore.getState().hourIdx).toBe(2);
+
+    useStore.setState({ day: JAN_FIRST, hourIdx: 1, showLate: true });
+    useStore.getState().stepHour(1);
+    expect(useStore.getState().day).toBe(JAN_FIRST);
+    expect(useStore.getState().hourIdx).toBe(2);
   });
 
   test("force bypasses the cache", async () => {

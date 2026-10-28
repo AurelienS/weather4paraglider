@@ -5,6 +5,10 @@ export { convectiveTop } from "./convection";
 
 export const ALT_STEP_M = 250;
 
+/** Gray veil starts here. The "see higher" ceiling uses the same mark,
+ * so the grid opens only where cloud would actually show. */
+export const CLOUD_VEIL_PCT = 10;
+
 export type GramCell = {
   z: number;
   belowTerrain: boolean;
@@ -165,8 +169,8 @@ export function thermalRgb(wMs: number): RGB {
 export function cellBackground(wMs: number, cloud: number | null): RGB {
   let rgb: RGB = PAPER;
   if (wMs > 0) rgb = thermalRgb(wMs);
-  if (cloud != null && cloud >= 10) {
-    const fog = 0.14 + 0.36 * ((cloud - 10) / 90);
+  if (cloud != null && cloud >= CLOUD_VEIL_PCT) {
+    const fog = 0.14 + 0.36 * ((cloud - CLOUD_VEIL_PCT) / (100 - CLOUD_VEIL_PCT));
     rgb = lerpRgb(rgb, [148, 150, 154], fog);
   }
   return rgb;

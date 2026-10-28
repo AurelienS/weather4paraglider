@@ -76,16 +76,51 @@ export function hourOfDay(iso: string): number {
   })
     .formatToParts(new Date(iso))
     .find((p) => p.type === "hour");
-  return Number.parseInt(part?.value ?? "0", 10);
+  const h = Number.parseInt(part?.value ?? "0", 10);
+  // Some engines report midnight as 24 with hour12: false.
+  return h === 24 ? 0 : h;
 }
 
-export const DISPLAY_HOURS = [
-  8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-] as const;
+/** Flying day shown unless the user opens a shoulder. 21:00 is after 20:00. */
+export const CORE_HOUR_MIN = 8;
+export const CORE_HOUR_MAX = 20;
 
-export function isDisplayHour(iso: string): boolean {
+export type HourWindow = { min: number; max: number };
+
+export const CORE_HOUR_WINDOW: HourWindow = { min: CORE_HOUR_MIN, max: CORE_HOUR_MAX };
+
+/** Early opens 00:00–07:00; late opens 21:00–23:00. The two sides are independent. */
+export function hourWindow(showEarly: boolean, showLate: boolean): HourWindow {
+  return {
+    min: showEarly ? 0 : CORE_HOUR_MIN,
+    max: showLate ? 23 : CORE_HOUR_MAX,
+  };
+}
+
+export function isDisplayHour(iso: string, window: HourWindow = CORE_HOUR_WINDOW): boolean {
   const h = hourOfDay(iso);
-  return h >= 8 && h <= 21;
+  return h >= window.min && h <= window.max;
+}
+
+function hoursIn(window: HourWindow): number[] {
+  const out: number[] = [];
+  for (let h = window.min; h <= window.max; h++) out.push(h);
+  return out;
+}
+
+/** True when this Paris day has at least one fetched hour on that shoulder. */
+export function dayHasShoulder(
+  hours: readonly { time: string }[],
+  day: string,
+  side: "early" | "late",
+): boolean {
+  for (const hour of hours) {
+    if (dayKey(hour.time) !== day) continue;
+    const h = hourOfDay(hour.time);
+    if (side === "early" && h < CORE_HOUR_MIN) return true;
+    if (side === "late" && h > CORE_HOUR_MAX) return true;
+  }
+  return false;
 }
 
 export type HourSlot = {
@@ -94,13 +129,13 @@ export type HourSlot = {
   data: Hour | null;
 };
 
-export function slotsForDay(hours: Hour[]): HourSlot[] {
+export function slotsForDay(hours: Hour[], window: HourWindow = CORE_HOUR_WINDOW): HourSlot[] {
   const byHour = new Map<number, Hour>();
   for (const item of hours) {
-    if (!isDisplayHour(item.time)) continue;
+    if (!isDisplayHour(item.time, window)) continue;
     byHour.set(hourOfDay(item.time), item);
   }
-  return DISPLAY_HOURS.map((hour) => ({
+  return hoursIn(window).map((hour) => ({
     hour,
     label: `${pad(hour)}:00`,
     data: byHour.get(hour) ?? null,
@@ -110,10 +145,11 @@ export function slotsForDay(hours: Hour[]): HourSlot[] {
 export function groupByDay<T extends { time: string }>(
   hours: readonly T[],
   lang: Lang = "en",
+  window: HourWindow = CORE_HOUR_WINDOW,
 ): { key: string; label: string; hours: T[] }[] {
   const map = new Map<string, T[]>();
   for (const hour of hours) {
-    if (!isDisplayHour(hour.time)) continue;
+    if (!isDisplayHour(hour.time, window)) continue;
     const key = dayKey(hour.time);
     const list = map.get(key);
     if (list) list.push(hour);
@@ -174,9 +210,10 @@ export function activeHourTime(
   day: string | null,
   hourIdx: number,
   lang: Lang = "en",
+  window: HourWindow = CORE_HOUR_WINDOW,
 ): string | null {
   if (!data) return null;
-  const days = groupByDay(data.hours, lang);
+  const days = groupByDay(data.hours, lang, window);
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
   const dayHours = days.find((d) => d.key === activeDay)?.hours ?? [];
   const hour = dayHours.find((h) => h.time === data.hours[hourIdx]?.time) ?? dayHours[0];
@@ -187,12 +224,13 @@ export function selectionAfterLoad(
   hours: readonly { time: string }[],
   prevDay: string | null,
   prevHourTime: string | null,
+  window: HourWindow = CORE_HOUR_WINDOW,
 ): DaySelection {
   if (hours.length === 0) return { day: null, hourIdx: 0 };
   const kept =
-    prevDay == null ? undefined : groupByDay(hours).find((d) => d.key === prevDay);
+    prevDay == null ? undefined : groupByDay(hours, "en", window).find((d) => d.key === prevDay);
   if (!kept) {
-    const visible = hours.filter((h) => isDisplayHour(h.time));
+    const visible = hours.filter((h) => isDisplayHour(h.time, window));
     const pool = visible.length > 0 ? visible : hours;
     const chosen = pool[pickDefaultHour(pool)];
     const hourIdx = chosen ? hours.findIndex((h) => h.time === chosen.time) : 0;
@@ -208,6 +246,28 @@ export function selectionAfterLoad(
   }
   const hourIdx = target ? hours.findIndex((h) => h.time === target.time) : -1;
   return { day: kept.key, hourIdx: hourIdx >= 0 ? hourIdx : 0 };
+}
+
+/** When a shoulder closes, pull an hour that fell outside the window back in.
+ * Returns null when the current hour is already inside. */
+export function snapHourIdx(
+  hours: readonly { time: string }[],
+  hourIdx: number,
+  window: HourWindow = CORE_HOUR_WINDOW,
+  lang: Lang = "en",
+): DaySelection | null {
+  const current = hours[hourIdx];
+  if (!current) return null;
+  const h = hourOfDay(current.time);
+  if (h >= window.min && h <= window.max) return null;
+  const key = dayKey(current.time);
+  const list = groupByDay(hours, lang, window).find((d) => d.key === key)?.hours;
+  if (!list || list.length === 0) return null;
+  const target = h < window.min ? list[0] : list[list.length - 1];
+  if (!target) return null;
+  const idx = hours.findIndex((item) => item.time === target.time);
+  if (idx < 0) return null;
+  return { day: key, hourIdx: idx };
 }
 
 export function windTone(kmh: number | null | undefined): "calm" | "ok" | "brisk" | "strong" | "hard" {

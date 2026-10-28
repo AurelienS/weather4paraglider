@@ -24,6 +24,14 @@ export const fr: Dict = {
   viewWindgram: "Windgram",
   viewSounding: "Émagramme",
   viewMeteogram: "Météogramme",
+  seeHigher: "Voir plus haut",
+  seeHigherBack: "Revenir à 5 km",
+  hoursEarly: "Avant 8 h",
+  hoursEarlyBack: "Dès 8 h",
+  hoursEarlyShort: "avant",
+  hoursLate: "Après 20 h",
+  hoursLateBack: "Jusqu'à 20 h",
+  hoursLateShort: "après",
   meteoLblCloud: "Nuages",
   meteoLblCbl: "Couche convective",
   meteoLblTd: "Rosée",
@@ -197,7 +205,10 @@ export const fr: Dict = {
     "la montée moyenne d'un thermique sec, avant le taux de chute de l'aile — un " +
     "cumulus au-dessus peut en ajouter, et un vent qui forcit avec l'altitude peut " +
     "déchirer le thermique. Repérez la ligne bleue en travers de la grille — " +
-    "l'isotherme 0 °C — pour suivre le niveau de gel.",
+    "l'isotherme 0 °C — pour suivre le niveau de gel. La grille s'arrête à 5 km. " +
+    "S'il y a des nuages au-dessus, Voir plus haut ouvre les lignes jusqu'à 10 km, " +
+    "là où un nuage peut encore influencer le vol, et les referme. Les heures vont de 8 h à 20 h. Avant 8 h " +
+    "et Après 20 h ouvrent le reste de la journée, et le referment.",
     demoSpeed: "vitesse du vent, km/h",
   demoGust: "rafale (affichée si elle ajoute 5 km/h ou plus)",
   demoArrow: "direction où va l'air",
@@ -221,9 +232,11 @@ export const fr: Dict = {
   guideSoundP3:
     "Là où les courbes orange et bleue se rapprochent, l'air est presque saturé : " +
     "c'est la base des nuages. Survolez le graphique pour lire la température et " +
-    "le point de rosée exacts à chaque altitude ; le profil du vent est dessiné à droite. " +
+    "le point de rosée exacts à chaque altitude ; le profil du vent est dessiné à droite, " +
+    "et chaque point mesuré montre où va l'air. " +
     "Les flèches de chaque côté du graphique avancent ou reculent d'une heure, " +
-    "y compris sur le jour suivant ou précédent.",
+    "y compris sur le jour suivant ou précédent. La ligne des heures, sous le " +
+    "graphique, saute directement à l'heure voulue.",
   guideWhyTitle: "Pourquoi cette appli ?",
   guideWhyModels:
     "Deux modèles sérieux : AROME 2,5 km de Météo-France et ICON D2 du DWD, tous " +

@@ -69,6 +69,9 @@ test("the getting-started guide explains models, coverage and quota", async ({ p
   await expect(page.locator(".gram-scale")).toContainText("km/h");
   await expect(page.locator(".gram-scale")).toContainText("m/s");
   await expect(page.locator(".guide")).toContainText("violet");
+  await expect(page.locator(".guide")).toContainText("See higher");
+  await expect(page.locator(".guide")).toContainText("Before 8:00");
+  await expect(page.locator(".guide")).toContainText("After 20:00");
   await expect(page.locator(".guide h3", { hasText: "The sounding, layer by layer" })).toBeVisible();
   await expect(page.locator(".guide")).toContainText("9.8 °C per kilometer");
   await expect(page.locator(".guide")).toContainText("left of that line");
@@ -224,6 +227,104 @@ test("the two model plates switch the forecast window and the URL", async ({ pag
   expect(om.calls()).toBe(before);
 });
 
+async function windgramTopM(page: Page): Promise<number> {
+  const text = await page.locator(".wg tbody tr th.z").first().innerText();
+  return Number.parseInt(text, 10);
+}
+
+async function soundingTopM(page: Page): Promise<number> {
+  const texts = await page.locator(".sounding text.tick-y").allTextContents();
+  return Math.max(...texts.map((text) => Number.parseInt(text, 10)));
+}
+
+async function soundingHingeClearsLabels(page: Page) {
+  const hinge = page.locator(".sounding .z-hinge text");
+  await expect(hinge).toBeVisible();
+  const box = await hinge.boundingBox();
+  expect(box).not.toBeNull();
+  const others = page.locator(
+    ".sounding .axis-title, .sounding .anno, .sounding .tick-y, .sounding .line-label",
+  );
+  const count = await others.count();
+  for (let i = 0; i < count; i++) {
+    const other = await others.nth(i).boundingBox();
+    if (!other || !box) continue;
+    const hit =
+      box.x < other.x + other.width - 1 &&
+      box.x + box.width > other.x + 1 &&
+      box.y < other.y + other.height - 1 &&
+      box.y + box.height > other.y + 1;
+    expect(hit, (await others.nth(i).textContent()) ?? "").toBe(false);
+  }
+}
+
+test("see higher opens the charts to 10 km and closes them", async ({ page }) => {
+  // Cloud stops at 7200 m (400 hPa). The open chart still runs to 10 km.
+  await mockOpenMeteo(page, { clearAboveM: 8000 });
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  const lift = page.getByRole("button", { name: "See higher" });
+  await expect(lift).toHaveAttribute("aria-pressed", "false");
+  // the hinge is the row sitting directly on top of 5000 m
+  await expect(page.locator(".wg tr.z-hinge + tr th.z")).toHaveText("5000");
+  expect(await windgramTopM(page)).toBe(5000);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(page.locator(".sounding")).toBeVisible();
+  await soundingHingeClearsLabels(page);
+  const soundingLift = page.locator(".sounding .z-hinge");
+  await soundingLift.click();
+  await expect(soundingLift).toHaveAttribute("aria-pressed", "true");
+  const ring = await soundingLift.evaluate((el) => getComputedStyle(el).outlineStyle);
+  expect(ring).toBe("none");
+  await soundingLift.click();
+  await expect(soundingLift).toHaveAttribute("aria-pressed", "false");
+  await page.locator('.seg[aria-label="View"] button:has-text("Windgram")').click();
+
+  await lift.click();
+  const back = page.getByRole("button", { name: "Back to 5 km" });
+  await expect(back).toHaveAttribute("aria-pressed", "true");
+  expect(await windgramTopM(page)).toBe(10000);
+  await expect(page.locator(".wg tr.z-hinge + tr th.z")).toHaveText("5000");
+  const openRow = await page.locator(".wg tr.z-hinge").boundingBox();
+  expect(openRow).not.toBeNull();
+  expect(openRow!.height).toBeLessThanOrEqual(3);
+  await expect(page.locator(".wg tbody tr th.z", { hasText: /^10250$/ })).toHaveCount(0);
+  await expect(page.locator(".wg tbody tr th.z", { hasText: /^7500$/ })).toHaveCount(1);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(page.locator(".sounding")).toBeVisible();
+  await expect(page.locator(".sounding .z-hinge")).toHaveAttribute("aria-label", "Back to 5 km");
+  await expect(page.locator(".sounding .z-hinge text")).toHaveCount(0);
+  const openLine = await page.locator(".sounding .z-hinge-bar").boundingBox();
+  expect(openLine).not.toBeNull();
+  expect(openLine!.height).toBeLessThanOrEqual(3);
+  expect(await soundingTopM(page)).toBe(10000);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  await expect(page.getByRole("button", { name: "See higher" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to 5 km" })).toHaveCount(0);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Windgram")').click();
+  expect(await windgramTopM(page)).toBe(10000);
+  await back.click();
+  await expect(lift).toHaveAttribute("aria-pressed", "false");
+  expect(await windgramTopM(page)).toBe(5000);
+});
+
+test("see higher stays hidden when the air above 5 km is clear", async ({ page }) => {
+  await mockOpenMeteo(page, { clearAboveM: 5000 });
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "See higher" })).toHaveCount(0);
+  expect(await windgramTopM(page)).toBe(5000);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(page.locator(".sounding")).toBeVisible();
+  expect(await soundingTopM(page)).toBeLessThanOrEqual(5000);
+});
+
 test("switching models keeps the selected day and hour when they exist", async ({ page }) => {
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
@@ -353,8 +454,9 @@ test("on a phone the windgram is compact and fits without inner scrolling", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.locator(".wg-panel.is-compact")).toBeVisible();
-  // hours are decimated: every other hour of the 08:00–21:00 window
-  await expect(page.locator(".wg thead th")).toHaveCount(8); // m + 7 hours
+  // hours are decimated: every other hour of the 08:00–20:00 window,
+  // plus the two shoulder columns
+  await expect(page.locator(".wg thead th")).toHaveCount(10); // m + before + 7 hours + after
   // the grid fits the viewport: no horizontal scroll inside the panel
   const scroll = await page.locator(".wg-scroll").evaluate((el) => ({
     inner: el.scrollWidth,
@@ -392,6 +494,13 @@ test("on a phone the desk stacks and never overflows", async ({ page }) => {
   expect(rail).not.toBeNull();
   expect(gram).not.toBeNull();
   expect(rail!.y).toBeLessThan(gram!.y);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(page.locator(".hour-line")).toBeVisible();
+  const soundingOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(soundingOverflow).toBeLessThanOrEqual(1);
 });
 
 test("reloading reads the localStorage cache without calling Open-Meteo", async ({ page }) => {
@@ -465,7 +574,8 @@ test("the thermal tint on the windgram starts at the ground row", async ({ page 
   await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
   const sol = page.locator('.wg tbody tr:has(th:text-is("sol 1696"))');
-  const midday = sol.locator("td").nth(5);
+  // a shoulder column sits before 08:00, so 13:00 is the 7th cell and 20:00 the 14th
+  const midday = sol.locator("td").nth(6);
   const night = sol.locator("td").nth(13);
   await expect(midday).toBeVisible();
   const [middayBg, nightBg] = await Promise.all([
@@ -488,8 +598,8 @@ test("windgram tooltip shows the thermal updraft at midday and not at night", as
   await page.goto("/?lat=45.945&lon=6.71");
   const row = page.locator('.wg tbody tr:has(th:text-is("2000"))');
   await expect(row).toBeVisible();
-  // 13:00 is the 6th column (hours start at 08:00); 21:00 is the 14th
-  await row.locator("td").nth(5).hover();
+  // 13:00 is the 7th cell (a shoulder column, then hours from 08:00); 20:00 is the 14th
+  await row.locator("td").nth(6).hover();
   await expect(page.locator(".wg-cursor-tip")).toContainText("m/s");
   await row.locator("td").nth(13).hover();
   await expect(page.locator(".wg-cursor-tip")).not.toContainText("m/s");
@@ -557,6 +667,21 @@ test("sounding labels the dry adiabat and the isotherms", async ({ page }) => {
   ).toBeVisible();
   await expect(page.locator(".sounding text.line-label:has-text('0 °C')")).toBeVisible();
   await expect(page.locator(".sounding text.line-label:text-is('-20°')")).toBeVisible();
+
+  // measured points aim where the air is heading: 10 m is 225°, the
+  // height levels 230°, the pressure levels 245°
+  const dirs = page.locator(".sounding .wind-dir");
+  await expect(dirs.first()).toBeVisible();
+  const rots = await dirs.evaluateAll((els) =>
+    els.map((el) => Number(/^rotate\(([-\d.]+)/.exec(el.getAttribute("transform") ?? "")?.[1])),
+  );
+  expect(rots).toContain(405);
+  expect(rots).toContain(410);
+  expect(rots).toContain(425);
+  expect(rots.every((rot) => rot === 405 || rot === 410 || rot === 425)).toBe(true);
+  const labels = await page.locator(".sounding .wind-dir-label").allTextContents();
+  expect(labels).toContain("SW");
+  expect(labels).toContain("WSW");
 });
 
 test("the meteogram tab draws the day in one shared plot", async ({ page }) => {
@@ -747,21 +872,187 @@ test("sounding arrows step through the hours and into the next day", async ({ pa
 
   while (await prev.isEnabled()) await prev.click();
   await expect(prev).toBeDisabled();
-  await expect(readout).toHaveText("08:00");
+  await expect(readout).toHaveText("00:00");
+
+  const line = page.locator(".hour-line");
+  const chart = await page.locator(".sounding").boundingBox();
+  const lineBox = await line.boundingBox();
+  const readoutBox = await readout.boundingBox();
+  expect(chart && lineBox && readoutBox).toBeTruthy();
+  expect(readoutBox!.y + readoutBox!.height).toBeLessThan(chart!.y);
+  expect(lineBox!.y).toBeGreaterThan(chart!.y + chart!.height - 1);
+  await line.getByRole("button", { name: "12:00" }).click();
+  await expect(readout).toHaveText("12:00");
+  const current = line.locator("button[aria-current='true']");
+  await expect(current).toHaveAccessibleName("12:00");
+  await expect.poll(async () => {
+    const mark = await line.locator(".hour-line-mark").boundingBox();
+    const box = await current.boundingBox();
+    if (!mark || !box) return false;
+    const mid = mark.x + mark.width / 2;
+    return mid > box.x - 1 && mid < box.x + box.width + 1;
+  }).toBe(true);
 
   await next.click();
-  await expect(readout).toHaveText("09:00");
+  await expect(readout).toHaveText("13:00");
   await page.keyboard.press("ArrowRight");
-  await expect(readout).toHaveText("10:00");
+  await expect(readout).toHaveText("14:00");
   await page.keyboard.press("ArrowLeft");
-  await expect(readout).toHaveText("09:00");
+  await expect(readout).toHaveText("13:00");
+  await expect(line.locator("button[aria-current='true']")).toHaveAccessibleName("13:00");
 
   // the last hour of the day continues into the next morning
-  for (let i = 0; i < 12; i++) await next.click();
-  await expect(readout).toHaveText("21:00");
+  await line.getByRole("button", { name: "23:00" }).click();
+  await expect(readout).toHaveText("23:00");
   await next.click();
-  await expect(readout).toHaveText("08:00");
+  await expect(readout).toHaveText("00:00");
   await expect(page.locator('.seg[aria-label="Day"] button').nth(1)).toHaveClass(/is-on/);
+  await expect(line.locator("button[aria-current='true']")).toHaveAccessibleName("00:00");
+
+  // a clicked hour keeps the keyboard focus while the arrows move the dot.
+  // that focus must recolor the digits, never paint a bar under them.
+  const midnight = line.getByRole("button", { name: "00:00" });
+  await midnight.click();
+  await page.keyboard.press("ArrowRight");
+  await expect(readout).toHaveText("01:00");
+  const focusPaint = await midnight.evaluate((el) => {
+    const style = getComputedStyle(el);
+    const scroller = el.closest(".hour-line-scroll");
+    const probe = document.createElement("span");
+    probe.style.color = "var(--focus)";
+    document.body.appendChild(probe);
+    const focus = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      outline: style.outlineStyle,
+      color: style.color,
+      focus,
+      visible: el.matches(":focus-visible"),
+      scrollTop: scroller instanceof HTMLElement ? scroller.scrollTop : -1,
+    };
+  });
+  expect(focusPaint.visible).toBe(true);
+  expect(focusPaint.outline).toBe("none");
+  expect(focusPaint.color).toBe(focusPaint.focus);
+  expect(focusPaint.scrollTop).toBe(0);
+});
+
+test("before 8:00 and after 20:00 open the shoulders and close them", async ({ page }) => {
+  await mockOpenMeteo(page, { clearAboveM: 5000 });
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  const hourHeads = async () => {
+    const heads = await page.locator(".wg thead th").allTextContents();
+    return heads.filter((label) => /^\d{2}:\d{2}$/.test(label));
+  };
+  let hours = await hourHeads();
+  expect(hours[0]).toBe("08:00");
+  expect(hours.at(-1)).toBe("20:00");
+  // the hinges are the columns pressed against 08:00 and 20:00
+  await expect(page.locator(".wg thead th").nth(1).locator("button")).toHaveText("before");
+  await expect(page.locator(".wg thead th").nth(2)).toHaveText("08:00");
+  await expect(page.locator(".wg thead th").last().locator("button")).toHaveText("after");
+  // the words sit in the middle of their columns, with no fill behind them
+  const tableBox = await page.locator(".wg").boundingBox();
+  const earlyMark = await page.locator(".hinge-mark").first().boundingBox();
+  const earlyCol = await page.locator(".wg td.hinge").first().boundingBox();
+  expect(tableBox && earlyMark && earlyCol).toBeTruthy();
+  expect(Math.abs(earlyMark!.y + earlyMark!.height / 2 - (tableBox!.y + tableBox!.height / 2))).toBeLessThan(20);
+  expect(earlyMark!.x + earlyMark!.width / 2).toBeGreaterThan(earlyCol!.x - 2);
+  expect(earlyMark!.x + earlyMark!.width / 2).toBeLessThan(earlyCol!.x + earlyCol!.width + 8);
+  const hingeBg = await page.locator(".wg td.hinge").first().evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { image: style.backgroundImage, color: style.backgroundColor };
+  });
+  expect(hingeBg.image).toBe("none");
+  expect(hingeBg.color).toBe("rgba(0, 0, 0, 0)");
+  expect(hours).not.toContain("00:00");
+  expect(hours).not.toContain("07:00");
+  expect(hours).not.toContain("21:00");
+  expect(hours).not.toContain("23:00");
+
+  const early = page.getByRole("button", { name: "Before 8:00" });
+  await expect(early).toHaveAttribute("aria-pressed", "false");
+  await early.click();
+  await expect(page.getByRole("button", { name: "From 8:00" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  hours = await hourHeads();
+  expect(hours).toContain("00:00");
+  expect(hours).toContain("07:00");
+  expect(hours.at(-1)).toBe("20:00");
+
+  await page.getByRole("button", { name: "After 20:00" }).click();
+  await expect(page.getByRole("button", { name: "Until 20:00" })).toHaveAttribute("aria-pressed", "true");
+  hours = await hourHeads();
+  expect(hours[0]).toBe("00:00");
+  expect(hours).toContain("21:00");
+  expect(hours.at(-1)).toBe("23:00");
+  await expect(
+    page.locator(".wg thead th", { hasText: "before" }).locator("xpath=following-sibling::th[1]"),
+  ).toHaveText("08:00");
+  await expect(
+    page.locator(".wg thead th", { hasText: "after" }).locator("xpath=preceding-sibling::th[1]"),
+  ).toHaveText("20:00");
+  // open shoulders are a line, still wide enough to click
+  const openSeams = page.locator(".wg thead th.hinge.is-on");
+  await expect(openSeams).toHaveCount(2);
+  for (const seam of await openSeams.all()) {
+    const box = await seam.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(3);
+  }
+  await expect(page.locator(".hinge-mark")).toHaveCount(0);
+  await page.getByRole("button", { name: "From 8:00" }).click();
+  await expect(page.getByRole("button", { name: "Before 8:00" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await page.getByRole("button", { name: "Before 8:00" }).click();
+  await expect(page.getByRole("button", { name: "From 8:00" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  await expect(page.getByRole("button", { name: "From 8:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Until 20:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Before 8:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "After 20:00" })).toHaveCount(0);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  const line = page.locator(".hour-line");
+  await expect(page.locator(".time-readout")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Before 8:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "After 20:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "From 8:00" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Until 20:00" })).toHaveCount(0);
+  await expect(line.getByRole("button", { name: "00:00" })).toBeVisible();
+  await expect(line.getByRole("button", { name: "23:00" })).toBeVisible();
+  await line.getByRole("button", { name: "07:00" }).click();
+  const readout = page.locator(".time-readout");
+  await expect(readout).toHaveText("07:00");
+  await expect(line.locator("button[aria-current='true']")).toHaveAccessibleName("07:00");
+
+  // closing a shoulder is a windgram concern: an hour outside 08:00–20:00 snaps back
+  await page.locator('.seg[aria-label="View"] button:has-text("Windgram")').click();
+  await page.getByRole("button", { name: "From 8:00" }).click();
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(readout).toHaveText("08:00");
+  await expect(line.locator("button[aria-current='true']")).toHaveAccessibleName("08:00");
+  await expect(line.getByRole("button", { name: "07:00" })).toBeVisible();
+
+  await line.getByRole("button", { name: "23:00" }).click();
+  await expect(readout).toHaveText("23:00");
+  await page.locator('.seg[aria-label="View"] button:has-text("Windgram")').click();
+  await page.getByRole("button", { name: "Until 20:00" }).click();
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  await expect(readout).toHaveText("20:00");
+  await expect(line.getByRole("button", { name: "23:00" })).toBeVisible();
+  await page.getByRole("button", { name: "Next hour" }).click();
+  await expect(readout).toHaveText("21:00");
 });
 
 test("arrow keys walk favorites, switch models, and step the sounding", async ({ page }) => {

@@ -81,6 +81,11 @@ const DMI_DOMAIN: ModelDomain = {
   lonMax: 32,
 };
 
+// Levels above 500 hPa (~5.6 km) feed the optional "see higher" view.
+// They stop at the top of the high-cloud layer each model actually publishes:
+// AROME/ARPEGE through 150 hPa (~13.8 km), ICON D2 through 200 hPa (~12 km).
+// ICON D2 returns empty series for 450, 350 and 150 hPa, so those are omitted.
+
 export const MODELS: readonly ModelDef[] = [
   {
     id: "arome_france_15min",
@@ -124,7 +129,10 @@ export const MODELS: readonly ModelDef[] = [
     api: "hourly",
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
-    pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    pressureLevels: [
+      1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+      250, 200, 150,
+    ],
     group: "allAltitude",
     domain: AROME_DOMAIN,
   },
@@ -139,7 +147,10 @@ export const MODELS: readonly ModelDef[] = [
     api: "hourly",
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
-    pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    pressureLevels: [
+      1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+      250, 200, 150,
+    ],
     group: "longRange",
     domain: EUROPE_DOMAIN,
   },
@@ -154,7 +165,10 @@ export const MODELS: readonly ModelDef[] = [
     api: "hourly",
     slotHours: 3,
     aglHeights: [20, 50, 80, 100, 120, 150, 180, 200],
-    pressureLevels: [1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500],
+    pressureLevels: [
+      1000, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300,
+      250, 200, 150,
+    ],
     group: "longRange",
     domain: WORLD_DOMAIN,
   },
@@ -184,7 +198,7 @@ export const MODELS: readonly ModelDef[] = [
     api: "hourly",
     slotHours: 3,
     aglHeights: [80, 100, 120, 180, 200],
-    pressureLevels: [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500],
+    pressureLevels: [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200],
     group: "allAltitude",
     domain: D2_DOMAIN,
   },

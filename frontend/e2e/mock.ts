@@ -15,6 +15,13 @@ const GEO_HEIGHTS: Record<string, number> = {
   "600": 4350,
   "550": 4940,
   "500": 5560,
+  "450": 6300,
+  "400": 7200,
+  "350": 8100,
+  "300": 9200,
+  "250": 10400,
+  "200": 11800,
+  "150": 13500,
 };
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -49,7 +56,7 @@ function airTemp(z: number, hour: number, elev: number): number {
   return tSfc - 0.0098 * zi + 3.5 - 0.0065 * (agl - zi);
 }
 
-function valueFor(v: string, hour: number, elev: number): number | null {
+function valueFor(v: string, hour: number, elev: number, clearAboveM?: number): number | null {
   if (v === "sensible_heat_flux" || v === "latent_heat_flux") return null;
   if (v === "shortwave_radiation") {
     return hour < 8 || hour > 18 ? 0 : Math.round(700 * sunFactor(hour));
@@ -75,7 +82,12 @@ function valueFor(v: string, hour: number, elev: number): number | null {
   if (pr) return Math.round(airTemp(GEO_HEIGHTS[pr[1]] ?? elev, hour, elev) * 10) / 10;
   if (/^dew_point_\d+hPa$/.test(v)) return -3;
   if (/^relative_humidity_\d+hPa$/.test(v)) return 55;
-  if (/^cloud_cover_\d+hPa$/.test(v)) return 60;
+  const cc = /^cloud_cover_(\d+)hPa$/.exec(v);
+  if (cc) {
+    const z = GEO_HEIGHTS[cc[1]!] ?? 1000;
+    if (clearAboveM != null && z > clearAboveM) return 0;
+    return 60;
+  }
   const ws = /^wind_speed_(\d+)hPa$/.exec(v);
   if (ws) return Math.round((12 + (1000 - Number(ws[1])) * 0.02) * 10) / 10;
   if (/^wind_direction_\d+hPa$/.test(v)) return 245;
@@ -84,7 +96,12 @@ function valueFor(v: string, hour: number, elev: number): number | null {
   return 0;
 }
 
-function buildPayload(q: URLSearchParams, elev: number, nullsAfter = Infinity): Record<string, unknown> {
+function buildPayload(
+  q: URLSearchParams,
+  elev: number,
+  nullsAfter = Infinity,
+  clearAboveM?: number,
+): Record<string, unknown> {
   const days = Math.max(1, Number(q.get("forecast_days") ?? "3") || 3);
   const m15 = (q.get("minutely_15") ?? "").split(",").filter(Boolean);
   const hourlyVars = (q.get("hourly") ?? "").split(",").filter(Boolean);
@@ -97,14 +114,16 @@ function buildPayload(q: URLSearchParams, elev: number, nullsAfter = Infinity): 
     const minutely: Record<string, Array<number | string | null>> = { time };
     for (const v of m15) {
       minutely[v] = time.map((_, i) =>
-        i >= nullsAfter * 4 ? null : valueFor(v, Math.floor(i / 4) % 24, elev),
+        i >= nullsAfter * 4 ? null : valueFor(v, Math.floor(i / 4) % 24, elev, clearAboveM),
       );
     }
     const hourly: Record<string, Array<number | string | null>> = {
       time: time.filter((t) => t.endsWith(":00")),
     };
     for (const v of hourlyVars) {
-      hourly[v] = hourly.time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24, elev)));
+      hourly[v] = hourly.time.map((_, i) =>
+        i >= nullsAfter ? null : valueFor(v, i % 24, elev, clearAboveM),
+      );
     }
     return {
       latitude: 45.95,
@@ -120,7 +139,9 @@ function buildPayload(q: URLSearchParams, elev: number, nullsAfter = Infinity): 
   for (let i = 0; i < hours; i++) time.push(stamp(Math.floor(i / 24), i % 24));
   const hourly: Record<string, Array<number | string | null>> = { time };
   for (const v of hourlyVars.length > 0 ? hourlyVars : allHourlyVars()) {
-    hourly[v] = time.map((_, i) => (i >= nullsAfter ? null : valueFor(v, i % 24, elev)));
+    hourly[v] = time.map((_, i) =>
+      i >= nullsAfter ? null : valueFor(v, i % 24, elev, clearAboveM),
+    );
   }
   return {
     latitude: 45.95,
@@ -148,6 +169,8 @@ export async function mockOpenMeteo(
     /** Return null values beyond this hour index (time stamps kept, like
         Open-Meteo does beyond a run's horizon). */
     nullsAfterHours?: number;
+    /** Cloud cover drops to 0 on pressure levels above this AMSL. */
+    clearAboveM?: number;
   } = {},
 ): Promise<OmMock> {
   let count = 0;
@@ -175,7 +198,9 @@ export async function mockOpenMeteo(
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(buildPayload(q, opts.elev ?? 1696, opts.nullsAfterHours ?? Infinity)),
+      body: JSON.stringify(
+        buildPayload(q, opts.elev ?? 1696, opts.nullsAfterHours ?? Infinity, opts.clearAboveM),
+      ),
     });
   });
   return { calls: () => count, urls: () => urls };

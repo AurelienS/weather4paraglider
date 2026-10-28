@@ -4,7 +4,9 @@ import { type ModelDef } from "./models";
 import type { AromeResponse, Hour, ProfilePoint, Surface } from "./types";
 
 export const MERGE_MIN_DZ_M = 80;
-export const PROFILE_Z_MAX_M = 6000;
+/** Drop isobars above the high-cloud layer. 150 hPa sits near 13.8 km;
+ * a warm column can lift it, so the cap leaves that level in. */
+export const PROFILE_Z_MAX_M = 16000;
 export const CLOUD_BASE_RH = 90;
 export const CLOUD_BASE_FRACT = 50;
 
@@ -100,7 +102,8 @@ export type TimeWindow = {
 export function resolveWindow(nowMs: number = Date.now(), days = 3): TimeWindow {
   const startParts = parisParts(nowMs);
   // full days (00:00–23:00): the meteogram spans 24 h; the windgram and the
-  // sounding still narrow their own display to 08:00–21:00 downstream
+  // sounding narrow their own display to 08:00–20:00, and can open the
+  // hours before 08:00 and after 20:00 downstream
   const startPseudo = Date.UTC(startParts.y, startParts.m - 1, startParts.d, 0, 0);
   const start = startPseudo - parisOffsetMs(startPseudo);
   const endParts = parisParts(nowMs + (days - 1) * 86_400_000);

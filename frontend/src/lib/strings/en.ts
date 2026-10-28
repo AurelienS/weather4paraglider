@@ -23,6 +23,14 @@ export const en = {
   viewWindgram: "Windgram",
   viewSounding: "Sounding",
   viewMeteogram: "Meteogram",
+  seeHigher: "See higher",
+  seeHigherBack: "Back to 5 km",
+  hoursEarly: "Before 8:00",
+  hoursEarlyBack: "From 8:00",
+  hoursEarlyShort: "before",
+  hoursLate: "After 20:00",
+  hoursLateBack: "Until 20:00",
+  hoursLateShort: "after",
   meteoLblCloud: "Clouds",
   meteoLblCbl: "Convective layer",
   meteoLblTd: "Dew point",
@@ -189,7 +197,10 @@ export const en = {
     "the updraft in m/s and the cloud cover. That speed is the average climb of a dry " +
     "thermal before your wing's sink — a cloud overhead can add more, and a strong " +
     "wind increase with height can tear the thermal apart. Follow the blue line across " +
-    "the grid — the 0 °C isotherm — to track the freezing level.",
+    "the grid — the 0 °C isotherm — to track the freezing level. The grid stops at " +
+    "5 km. When cloud sits above that, See higher opens the rows up to 10 km, " +
+    "where cloud can still affect a flight, and closes them again. Hours run from 8:00 to 20:00. Before 8:00 " +
+    "and After 20:00 open the rest of the day, and close it again.",
     demoSpeed: "wind speed, km/h",
   demoGust: "gust (only when it adds 5 km/h or more)",
   demoArrow: "where the air is heading",
@@ -212,8 +223,10 @@ export const en = {
   guideSoundP3:
     "Where the orange and blue curves pinch together, the air is nearly saturated: " +
     "that is the cloud base. Hover the chart to read the exact temperature and dew " +
-    "point at any altitude; the wind profile is drawn on the right. The arrows on " +
-    "either side of the chart move one hour at a time, into the next or previous day.",
+    "point at any altitude; the wind profile is drawn on the right, and each measured " +
+    "point shows where the air is heading. The arrows on " +
+    "either side of the chart move one hour at a time, into the next or previous day. " +
+    "The hour line under the chart jumps straight to an hour.",
   guideWhyTitle: "Why this app?",
   guideWhyModels:
     "Two serious models: Météo-France AROME 2.5 km and DWD ICON D2, both with the " +

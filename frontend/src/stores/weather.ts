@@ -2,7 +2,7 @@
 import { fetchArome } from "../api/client";
 import type { AromeResponse } from "../api/types";
 import { DEFAULT_MODEL, type ModelId } from "../api/models";
-import { activeHourTime, selectionAfterLoad } from "../lib/format";
+import { activeHourTime, hourWindow, selectionAfterLoad } from "../lib/format";
 import { dict } from "../lib/i18n";
 import type { SliceCreator } from "./index";
 
@@ -53,8 +53,9 @@ export const createWeatherSlice: SliceCreator<WeatherSlice> = (set, get) => ({
     mainCtl = ctl;
     const carry = opts.carry ?? false;
     const prevDay = carry ? get().day : null;
+    const spanAtStart = hourWindow(get().showEarly, get().showLate);
     const prevHourTime = carry
-      ? activeHourTime(get().data, get().day, get().hourIdx, lang)
+      ? activeHourTime(get().data, get().day, get().hourIdx, lang, spanAtStart)
       : null;
 
     fetchArome(point.lat, point.lon, modelId, {
@@ -64,7 +65,8 @@ export const createWeatherSlice: SliceCreator<WeatherSlice> = (set, get) => ({
     })
       .then((payload) => {
         if (ctl.signal.aborted) return;
-        const next = selectionAfterLoad(payload.hours, prevDay, prevHourTime);
+        const span = hourWindow(get().showEarly, get().showLate);
+        const next = selectionAfterLoad(payload.hours, prevDay, prevHourTime, span);
         set({ data: payload, hourIdx: next.hourIdx, day: next.day, activeZ: null });
       })
       .catch((err: unknown) => {

@@ -1,17 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { soundingAvailable } from "./api/pipeline";
+import { altitudeCeiling, canSeeHigher } from "./lib/ceiling";
 import { Guide } from "./components/Guide";
+import { HourLine } from "./components/HourLine";
 import { Meteogram } from "./components/Meteogram";
 import { PageNav, type Page } from "./components/PageNav";
 import { PlaceRail } from "./components/PlaceRail";
 import { SiteForm } from "./components/SiteForm";
 import { Sounding } from "./components/Sounding";
 import { SurfaceStats } from "./components/SurfaceStats";
-import { Windgram } from "./components/Windgram";
+import { Windgram, type ChartHinge } from "./components/Windgram";
 import { useI18n } from "./i18nContext";
 import { trackEvent, trackPageView } from "./lib/analytics";
 import { deskHandlesArrow, stepFavorites, stepPrimaryModel } from "./lib/keys";
-import { groupByDay, hourLabel, utcSlot } from "./lib/format";
+import { dayHasShoulder, groupByDay, hourLabel, hourWindow, utcSlot } from "./lib/format";
 import { interpolate, LANGS, type Lang } from "./lib/i18n";
 import { meteoHoursForDay } from "./lib/meteogram";
 import { useIsMobile } from "./lib/useIsMobile";
@@ -24,8 +26,6 @@ const LANG_NAMES: Record<Lang, string> = {
   de: "Deutsch",
   es: "Español",
 };
-
-const Z_MAX_M = 5000;
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -106,6 +106,11 @@ export default function App() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const selectDay = useStore((s) => s.selectDay);
+  const selectHourTime = useStore((s) => s.selectHourTime);
+  const showEarly = useStore((s) => s.showEarly);
+  const showLate = useStore((s) => s.showLate);
+  const setShowEarly = useStore((s) => s.setShowEarly);
+  const setShowLate = useStore((s) => s.setShowLate);
 
   const compare = useStore((s) => s.compare);
 
@@ -115,6 +120,7 @@ export default function App() {
   const [guide, setGuide] = useState(
     () => new URLSearchParams(window.location.search).get("guide") === "1",
   );
+  const [lifted, setLifted] = useState(false);
 
   const page: Page = guide ? "guide" : "place";
 
@@ -243,24 +249,60 @@ export default function App() {
     useStore.getState().goHome();
   }
 
+  const span = useMemo(() => hourWindow(showEarly, showLate), [showEarly, showLate]);
   const days = useMemo(
-    () => (data ? groupByDay(data.hours, lang) : []),
+    () => (data ? groupByDay(data.hours, lang, span) : []),
+    [data, lang, span],
+  );
+  const soundingDays = useMemo(
+    () => (data ? groupByDay(data.hours, lang, hourWindow(true, true)) : []),
     [data, lang],
   );
   const activeDay = day && days.some((d) => d.key === day) ? day : days[0]?.key;
   const dayIndex = days.findIndex((d) => d.key === activeDay);
   const dayHours = days[dayIndex]?.hours ?? [];
+  const soundingDayIndex = soundingDays.findIndex((d) => d.key === activeDay);
+  const soundingHours = soundingDays[soundingDayIndex]?.hours ?? [];
   const meteoHours = useMemo(
     () => (data && activeDay ? meteoHoursForDay(data.hours, activeDay) : []),
     [data, activeDay],
   );
+  const seeHigher = canSeeHigher(dayHours);
+  const zMax = altitudeCeiling(dayHours, lifted);
+  const earlyReach =
+    data != null && activeDay != null && dayHasShoulder(data.hours, activeDay, "early");
+  const lateReach =
+    data != null && activeDay != null && dayHasShoulder(data.hours, activeDay, "late");
+  const liftHinge: ChartHinge | null = seeHigher
+    ? {
+        open: lifted,
+        label: lifted ? t.seeHigherBack : t.seeHigher,
+        onToggle: () => setLifted((open) => !open),
+      }
+    : null;
+  const earlyHinge: ChartHinge | null = earlyReach
+    ? {
+        open: showEarly,
+        label: showEarly ? t.hoursEarlyBack : t.hoursEarly,
+        text: t.hoursEarlyShort,
+        onToggle: () => setShowEarly(!showEarly),
+      }
+    : null;
+  const lateHinge: ChartHinge | null = lateReach
+    ? {
+        open: showLate,
+        label: showLate ? t.hoursLateBack : t.hoursLate,
+        text: t.hoursLateShort,
+        onToggle: () => setShowLate(!showLate),
+      }
+    : null;
   const hour =
-    dayHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? dayHours[0];
-  const hourIndex = hour ? dayHours.findIndex((h) => h.time === hour.time) : -1;
-  const canPrev = hourIndex > 0 || dayIndex > 0;
+    soundingHours.find((h) => h.time === data?.hours[hourIdx]?.time) ?? soundingHours[0];
+  const hourIndex = hour ? soundingHours.findIndex((h) => h.time === hour.time) : -1;
+  const canPrev = hourIndex > 0 || soundingDayIndex > 0;
   const canNext =
-    (hourIndex >= 0 && hourIndex < dayHours.length - 1) ||
-    (dayIndex >= 0 && dayIndex < days.length - 1);
+    (hourIndex >= 0 && hourIndex < soundingHours.length - 1) ||
+    (soundingDayIndex >= 0 && soundingDayIndex < soundingDays.length - 1);
 
   return (
     <div className="app">
@@ -404,8 +446,12 @@ export default function App() {
                     <Windgram
                       hours={dayHours}
                       elevationM={data.modelElevationM}
-                      zMax={Z_MAX_M}
+                      zMax={zMax}
                       compact={isMobile}
+                      span={span}
+                      lift={liftHinge}
+                      early={earlyHinge}
+                      late={lateHinge}
                     />
                   ) : view === "meteogram" ? (
                     meteoHours.length > 0 ? (
@@ -433,7 +479,18 @@ export default function App() {
                       <div className="sounding-col">
                         <p className="time-readout">{hourLabel(hour.time)}</p>
                         <SurfaceStats hour={hour} elevationM={data.modelElevationM} />
-                        <Sounding hour={hour} elevationM={data.modelElevationM} />
+                        <Sounding
+                          hour={hour}
+                          elevationM={data.modelElevationM}
+                          zMax={zMax}
+                          lift={liftHinge}
+                        />
+                        <HourLine
+                          hours={soundingHours}
+                          current={hour.time}
+                          label={t.hourLabel}
+                          onSelect={selectHourTime}
+                        />
                       </div>
                       <button
                         type="button"

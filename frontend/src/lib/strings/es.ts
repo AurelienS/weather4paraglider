@@ -24,6 +24,14 @@ export const es: Dict = {
   viewWindgram: "Windgram",
   viewSounding: "Sounding",
   viewMeteogram: "Meteograma",
+  seeHigher: "Ver más arriba",
+  seeHigherBack: "Volver a 5 km",
+  hoursEarly: "Antes de las 8",
+  hoursEarlyBack: "Desde las 8",
+  hoursEarlyShort: "antes",
+  hoursLate: "Después de las 20",
+  hoursLateBack: "Hasta las 20",
+  hoursLateShort: "después",
   meteoLblCloud: "Nubes",
   meteoLblCbl: "Capa convectiva",
   meteoLblTd: "Rocío",
@@ -195,7 +203,10 @@ export const es: Dict = {
     "Esa velocidad es la subida media de una térmica seca, antes del hundimiento " +
     "del ala — un cúmulo encima puede añadir más, y un viento que arrecia con la " +
     "altura puede romper la térmica. Sigue la línea azul a través de la rejilla — " +
-    "la isoterma de 0 °C — para rastrear el nivel de congelación.",
+    "la isoterma de 0 °C — para rastrear el nivel de congelación. La rejilla se " +
+    "detiene a 5 km. Si hay nube por encima, Ver más arriba abre las filas hasta " +
+    "10 km, donde una nube aún puede influir en el vuelo, y las vuelve a cerrar. Las horas van de las 8 a las 20. " +
+    "Antes de las 8 y Después de las 20 abren el resto del día y lo vuelven a cerrar.",
     demoSpeed: "velocidad del viento, km/h",
   demoGust: "racha (solo cuando añade 5 km/h o más)",
   demoArrow: "hacia dónde va el aire",
@@ -219,7 +230,9 @@ export const es: Dict = {
   guideSoundP3:
     "Donde las curvas naranja y azul se juntan, el aire está casi saturado: esa es " +
     "la base de las nubes. Pasa el ratón por el gráfico para leer la temperatura y " +
-    "el punto de rocío exactos a cada altitud; el perfil del viento se dibuja a la derecha.",
+    "el punto de rocío exactos a cada altitud; el perfil del viento se dibuja a la derecha, " +
+    "y cada punto medido muestra hacia dónde va el aire. " +
+    "La línea de horas bajo el gráfico salta directamente a la hora elegida.",
   guideWhyTitle: "¿Por qué esta app?",
   guideWhyModels:
     "Dos modelos serios: AROME 2,5 km de Météo-France e ICON D2 del DWD, ambos con " +

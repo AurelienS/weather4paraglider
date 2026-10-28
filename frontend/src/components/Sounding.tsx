@@ -1,10 +1,13 @@
 import { useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { Hour } from "../api/types";
 import { clamp, linePath, niceRange, ticks } from "../lib/chart";
+import { FLYING_Z_MAX_M } from "../lib/ceiling";
+import type { ChartHinge } from "./Windgram";
 import { sampleAt, sampleDir } from "../lib/cursor";
 import { compass } from "../lib/format";
 import { interpolate, type Dict, type Lang } from "../lib/i18n";
 import { smoothPath } from "../lib/meteogram";
+import { windLabelMask } from "../lib/windmark";
 import { useI18n } from "../i18nContext";
 
 const VB_W = 920;
@@ -13,10 +16,18 @@ const PAD = { top: 28, right: 20, bottom: 44, left: 56 };
 const WIND_W = 200;
 const GAP = 28;
 const DALR = 9.8;
+/** Same calm threshold as the windgram needle: below this, direction is noise. */
+const CALM_WIND_KMH = 1.5;
+/** Compass letters need this much vertical room or they pile up. */
+const WIND_LABEL_GAP = 14;
 
 type Props = {
   hour: Hour;
   elevationM: number;
+  /** AMSL cap of the vertical axis. Defaults to the flying window. */
+  zMax?: number;
+  /** Strip sitting just above 5 km. Null hides it. */
+  lift?: ChartHinge | null;
 };
 
 type LevelRead = {
@@ -32,9 +43,12 @@ type LevelRead = {
 
 type HoverBox = LevelRead & { left: number; top: number; flip: boolean };
 
-export function Sounding({ hour, elevationM }: Props) {
+export function Sounding({ hour, elevationM, zMax = FLYING_Z_MAX_M, lift = null }: Props) {
   const { t, lang } = useI18n();
-  const layout = useMemo(() => buildLayout(hour, elevationM), [hour, elevationM]);
+  const layout = useMemo(
+    () => buildLayout(hour, elevationM, zMax),
+    [hour, elevationM, zMax],
+  );
   const uid = useId().replace(/:/g, "");
 
   const plotRef = useRef<HTMLDivElement>(null);
@@ -243,10 +257,35 @@ export function Sounding({ hour, elevationM }: Props) {
           })}
           <g clipPath={`url(#wind-${uid})`}>
             {layout.windPath ? <path d={layout.windPath} className="curve-wind" /> : null}
-            {layout.windDots.map((d) => (
-              <circle key={`wdot-${d.z}`} cx={d.x} cy={d.y} r="2.2" className="wind-dot" />
-            ))}
           </g>
+          {layout.windDots.map((d, i) => {
+            const dir = d.dir;
+            const aimed = dir != null && d.wind >= CALM_WIND_KMH;
+            const label = aimed && layout.windLabels[i] === true;
+            const flip = layout.windRight - d.x < 36;
+            return (
+              <g key={`wdot-${d.z}`}>
+                {aimed ? (
+                  <g className="wind-dir" transform={`rotate(${dir + 180} ${d.x} ${d.y})`}>
+                    <circle className="wind-dir-hole" cx={d.x} cy={d.y} r="2.6" />
+                    <path d={headingArrow(d.x, d.y)} className="wind-dir-arrow" />
+                  </g>
+                ) : (
+                  <circle cx={d.x} cy={d.y} r="2.2" className="wind-dot" />
+                )}
+                {label ? (
+                  <text
+                    className="wind-dir-label"
+                    x={d.x + (flip ? -8 : 8)}
+                    y={d.y + 3}
+                    textAnchor={flip ? "end" : "start"}
+                  >
+                    {compass(dir, lang)}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
           <rect
             x={layout.windLeft}
             y={PAD.top}
@@ -257,6 +296,15 @@ export function Sounding({ hour, elevationM }: Props) {
           />
         </g>
 
+        {lift ? (
+          <ZHinge
+            lift={lift}
+            y={layout.yOf(FLYING_Z_MAX_M)}
+            plotTop={PAD.top}
+            x={PAD.left}
+            width={layout.windRight - PAD.left}
+          />
+        ) : null}
         {card ? (
           <g className="cursor" pointerEvents="none">
             <line
@@ -381,6 +429,75 @@ function readLevel(hour: Hour, z: number): LevelRead {
   };
 }
 
+function ZHinge({
+  lift,
+  y,
+  plotTop,
+  x,
+  width,
+}: {
+  lift: ChartHinge;
+  y: number;
+  plotTop: number;
+  x: number;
+  width: number;
+}) {
+  // At the default cap the 5 km line is the top edge, so the words sit
+  // just inside the plot. Once open, the control is only that line.
+  const textY = plotTop + 13;
+  const hitTop = lift.open ? y - 8 : Math.min(textY - 12, y - 8);
+  const hitBottom = lift.open ? y + 8 : Math.max(textY + 4, y + 6);
+  return (
+    <g
+      className={lift.open ? "z-hinge is-on" : "z-hinge"}
+      role="button"
+      tabIndex={0}
+      aria-pressed={lift.open}
+      aria-label={lift.label}
+      onClick={lift.onToggle}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        lift.onToggle();
+      }}
+    >
+      {lift.open ? <title>{lift.label}</title> : null}
+      <rect
+        className="z-hinge-hit"
+        x={x}
+        y={hitTop}
+        width={width}
+        height={hitBottom - hitTop}
+      />
+      <line className="z-hinge-bar" x1={x} y1={y} x2={x + width} y2={y} />
+      {lift.open ? null : (
+        <text x={x + width / 2} y={textY} textAnchor="middle">
+          {lift.label}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/** Tip points up, before the group rotates it onto the heading. */
+function headingArrow(x: number, y: number): string {
+  const pts: ReadonlyArray<readonly [number, number]> = [
+    [0, -6.4],
+    [3.6, -1.2],
+    [1.25, -1.6],
+    [1.25, 5],
+    [-1.25, 5],
+    [-1.25, -1.6],
+    [-3.6, -1.2],
+  ];
+  const cmds = pts.map(([dx, dy], i) => {
+    const px = (x + dx).toFixed(2);
+    const py = (y + dy).toFixed(2);
+    return `${i === 0 ? "M" : "L"}${px},${py}`;
+  });
+  return `${cmds.join(" ")} Z`;
+}
+
 function fmt(v: number | null): string {
   return v == null ? "—" : `${v.toFixed(1)}°`;
 }
@@ -389,14 +506,13 @@ function thetaOf(t: number, z: number, zRef: number): number {
   return t + (DALR * (z - zRef)) / 1000;
 }
 
-function buildLayout(hour: Hour, elevationM: number) {
-  const profile = hour.profile;
+function buildLayout(hour: Hour, elevationM: number, zCap: number) {
+  const profile = hour.profile.filter((p) => p.z <= zCap);
   const zRef = elevationM;
   const zs = profile.map((p) => p.z);
   const winds = profile.map((p) => p.wind).filter((v): v is number => v != null);
   const zLo = Math.min(elevationM, ...(zs.length ? zs : [elevationM]), 0);
-  const zHi = Math.max(...(zs.length ? zs : [elevationM]), elevationM + 500, 3000);
-  const [zMin, zMax] = niceRange(zLo - 80, zHi + 80, 500);
+  const [zMin, zMax] = niceRange(zLo - 80, zCap, 500);
 
   const t0 = profile[0]?.t;
   const z0 = profile[0]?.z ?? zRef;
@@ -448,7 +564,13 @@ function buildLayout(hour: Hour, elevationM: number) {
 
   const windPts = profile
     .filter((p) => p.wind != null)
-    .map((p) => ({ x: xW(p.wind as number), y: yOf(p.z), z: p.z }));
+    .map((p) => ({
+      x: xW(p.wind as number),
+      y: yOf(p.z),
+      z: p.z,
+      wind: p.wind as number,
+      dir: p.dir,
+    }));
 
   const dalrX = t0 != null ? xTh(thCenter) : null;
 
@@ -492,10 +614,17 @@ function buildLayout(hour: Hour, elevationM: number) {
     tdDots: tdPts,
     windPath: windPts.length >= 2 ? smoothPath(windPts) : "",
     windDots: windPts,
+    windLabels: windLabelMask(
+      windPts.map((p) => p.y),
+      WIND_LABEL_GAP,
+    ),
     dalrX,
     isoPaths,
     isoLabels,
     groundPath,
-    cloudBaseY: hour.surface.cloudBaseM != null ? yOf(hour.surface.cloudBaseM) : null,
+    cloudBaseY:
+      hour.surface.cloudBaseM != null && hour.surface.cloudBaseM <= zCap
+        ? yOf(hour.surface.cloudBaseM)
+        : null,
   };
 }

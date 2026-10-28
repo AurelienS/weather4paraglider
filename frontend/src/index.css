@@ -1364,6 +1364,94 @@ select optgroup {
   vertical-align: 0;
 }
 
+/* One line of hours, under the sounding. The scroll box clips the row;
+   the inner line is as wide as the hours, so the bar and the dot span the day. */
+.hour-line-scroll {
+  margin-top: 10px;
+  overflow-x: auto;
+  /* clip, not hidden: a focus ring must not scroll this axis and leave a sliver */
+  overflow-y: clip;
+  scrollbar-width: none;
+}
+
+.hour-line-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.hour-line {
+  position: relative;
+  display: flex;
+  min-width: 100%;
+  width: max-content;
+}
+
+.hour-line-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 1px;
+  background: color-mix(in srgb, var(--focus) 55%, transparent);
+  pointer-events: none;
+}
+
+.hour-line-mark {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--focus);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hour-line-mark.is-on {
+  opacity: 1;
+  transition: left 160ms ease;
+}
+
+.hour-line button {
+  position: relative;
+  flex: 1 0 26px;
+  min-width: 26px;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 500 11px/1 var(--mono);
+  cursor: pointer;
+}
+
+.hour-line button::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  width: 1px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--focus) 50%, transparent);
+}
+
+.hour-line button.is-on {
+  color: var(--text);
+}
+
+/* A ring around these short buttons was clipped into a bar under the digits.
+   The focused hour is the digits themselves, in the focus color. */
+.hour-line button:focus,
+.hour-line button:focus-visible {
+  outline: none;
+}
+
+.hour-line button:focus-visible {
+  color: var(--focus);
+}
+
 .pick {
   display: flex;
   align-items: center;
@@ -1584,6 +1672,11 @@ select optgroup {
   overflow-x: auto;
 }
 
+/* Positioning box for the hour-column labels, as tall as the grid. */
+.wg-frame {
+  position: relative;
+}
+
 .wg {
   border-collapse: collapse;
   table-layout: fixed;
@@ -1714,6 +1807,180 @@ select optgroup {
   box-shadow: inset 0 1px 0 #7a3e24;
 }
 
+.wg tr.z-hinge th {
+  padding: 0;
+  background: var(--paper);
+  border-bottom: 1px dashed rgba(122, 62, 36, 0.55);
+}
+
+.wg tr.z-hinge button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #7a3e24;
+  font: italic 500 12px var(--sans);
+  letter-spacing: 0.03em;
+  text-align: center;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.wg tr.z-hinge button span {
+  position: sticky;
+  left: 50%;
+  display: inline-block;
+  transform: translateX(-50%);
+}
+
+/* Open: the row collapses to the border. The button sticks out so the
+   clickable strip is taller than the line. */
+.wg tr.z-hinge.is-on th {
+  height: 1px;
+  font-size: 0;
+  line-height: 0;
+  background: transparent;
+  border-bottom: 1px solid #7a3e24;
+  position: relative;
+  z-index: 2;
+}
+
+.wg tr.z-hinge.is-on button {
+  position: absolute;
+  left: 0;
+  top: -8px;
+  width: 100%;
+  height: 16px;
+  padding: 0;
+}
+
+.wg tr.z-hinge.is-on button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  transform: none;
+}
+
+.wg tr.z-hinge button:focus-visible {
+  outline: 1px solid #7a3e24;
+  outline-offset: -2px;
+}
+
+.wg th.hinge,
+.wg td.hinge {
+  width: 12px;
+  min-width: 12px;
+  max-width: 12px;
+  padding: 0;
+  background: transparent;
+  border-right: 1px dashed rgba(122, 62, 36, 0.55);
+}
+
+/* Open: the column collapses to its border. The hit target is wider. */
+.wg th.hinge.is-on,
+.wg td.hinge.is-on {
+  width: 1px;
+  min-width: 1px;
+  max-width: 1px;
+  padding: 0;
+  background: transparent;
+  border-right: 1px solid #7a3e24;
+  border-bottom-color: transparent;
+}
+
+.wg thead th.hinge.is-on,
+.wg tfoot th.hinge.is-on {
+  z-index: 4;
+}
+
+.wg tfoot th.hinge.is-on {
+  border-top-color: transparent;
+}
+
+.wg td.hinge.is-on {
+  position: relative;
+  z-index: 1;
+}
+
+.wg th.hinge.is-on button {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  min-height: 22px;
+  transform: translateX(-50%);
+}
+
+.wg td.hinge.is-on::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  transform: translateX(-50%);
+}
+
+.wg th.hinge button {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The name stays available to the button. The visible word is the mark. */
+.wg th.hinge .hinge-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.wg .hinge-mark {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 12px;
+  overflow: hidden;
+  /* left is the column center (the cell centers its static position) */
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.wg .hinge-mark span {
+  display: inline-block;
+  color: #7a3e24;
+  font: italic 500 11px/1 var(--sans);
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+.wg td.hinge {
+  cursor: pointer;
+}
+
+.wg th.hinge button:focus-visible {
+  outline: 1px solid #7a3e24;
+  outline-offset: -2px;
+}
+
 .wg th.empty {
   color: #9a9488;
   font-weight: 500;
@@ -1785,6 +2052,41 @@ select optgroup {
   width: 100%;
   min-width: 720px;
   height: auto;
+}
+
+.z-hinge {
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.z-hinge:focus,
+.z-hinge:focus-visible {
+  outline: none;
+}
+
+.z-hinge-hit {
+  fill: transparent;
+}
+
+.z-hinge-bar {
+  stroke: #7a3e24;
+  stroke-dasharray: 3 3;
+  stroke-width: 1.25;
+}
+
+.z-hinge.is-on .z-hinge-bar {
+  stroke-dasharray: none;
+  stroke-width: 1;
+}
+
+.z-hinge text {
+  fill: #7a3e24;
+  font: italic 500 12px var(--sans);
+}
+
+.z-hinge:focus-visible .z-hinge-bar {
+  stroke-width: 1.6;
 }
 
 /* meteogram: meteoblue-style stacked surface panels */
@@ -2028,6 +2330,19 @@ select optgroup {
   fill: #8a6a22;
 }
 
+.wind-dir-hole {
+  fill: var(--paper);
+}
+
+.wind-dir-arrow {
+  fill: #8a6a22;
+}
+
+.wind-dir-label {
+  fill: #6b5420;
+  font: 600 10px var(--sans);
+}
+
 .cloud-base {
   stroke: #9ab0c4;
   stroke-width: 1.2;
@@ -2219,6 +2534,36 @@ select optgroup {
   min-width: 42px;
   padding: 5px 2px;
   font-size: 10px;
+}
+
+.wg-panel.is-compact .wg thead th.hinge,
+.wg-panel.is-compact .wg tfoot th.hinge,
+.wg-panel.is-compact .wg td.hinge {
+  width: 10px;
+  min-width: 10px;
+  max-width: 10px;
+  padding: 0;
+}
+
+.wg-panel.is-compact .wg thead th.hinge.is-on,
+.wg-panel.is-compact .wg tfoot th.hinge.is-on,
+.wg-panel.is-compact .wg td.hinge.is-on {
+  width: 1px;
+  min-width: 1px;
+  max-width: 1px;
+  padding: 0;
+}
+
+.wg-panel.is-compact .wg-frame {
+  width: 100%;
+}
+
+.wg-panel.is-compact .wg .hinge-mark {
+  width: 10px;
+}
+
+.wg-panel.is-compact .wg .hinge-mark span {
+  font-size: 9px;
 }
 
 .wg-panel.is-compact .wg td.cell,
