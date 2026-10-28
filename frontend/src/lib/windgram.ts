@@ -5,6 +5,11 @@ export { convectiveTop } from "./convection";
 
 export const ALT_STEP_M = 250;
 
+/** Above the flying cap the windgram steps 500 m, not 250 m.
+ * The cap matches FLYING_Z_MAX_M in ceiling.ts. */
+const COARSE_FROM_M = 5000;
+const ALT_STEP_ABOVE_M = 500;
+
 /** Gray veil starts here. The "see higher" ceiling uses the same mark,
  * so the grid opens only where cloud would actually show. */
 export const CLOUD_VEIL_PCT = 10;
@@ -34,14 +39,15 @@ export type RGB = [number, number, number];
  *   1.2–2.2  gold      a climb, about 1 m/s on the vario at the top
  *   2.2–3.5  vermilion strong
  *   3.5–6    violet    rough; the average rarely passes 6
- * Wind arrows keep their own green–red scale. Each tint stays light enough
- * for the dark speed number.
+ * Wind arrows keep their own green–red scale. The wash is already the hue,
+ * light enough for dark figures. Dark charts use the same hues, held dark
+ * enough for light figures, with enough chroma that a weak climb still reads.
  */
 const THERMAL_BANDS: readonly { from: number; to: number; wash: RGB; solid: RGB }[] = [
-  { from: 0.5, to: 1.2, wash: [198, 224, 216], solid: [110, 186, 174] },
-  { from: 1.2, to: 2.2, wash: [246, 228, 170], solid: [232, 186, 78] },
-  { from: 2.2, to: 3.5, wash: [242, 170, 148], solid: [214, 96, 84] },
-  { from: 3.5, to: 6, wash: [214, 160, 196], solid: [168, 124, 198] },
+  { from: 0.5, to: 1.2, wash: [172, 214, 202], solid: [110, 186, 174] },
+  { from: 1.2, to: 2.2, wash: [240, 210, 132], solid: [232, 186, 78] },
+  { from: 2.2, to: 3.5, wash: [236, 152, 130], solid: [214, 96, 84] },
+  { from: 3.5, to: 6, wash: [200, 146, 190], solid: [168, 124, 198] },
 ];
 
 /** Legend stops: a wash and a solid per band, so the guide bar cuts cleanly. */
@@ -63,7 +69,15 @@ const WIND_STOPS: [number, RGB][] = [
 export function altitudeLevels(elevM: number, zMax: number, step = ALT_STEP_M): number[] {
   const start = Math.ceil((elevM + 15) / step) * step;
   const levels: number[] = [];
-  for (let z = start; z <= zMax; z += step) levels.push(z);
+  const fineTop = Math.min(zMax, COARSE_FROM_M);
+  for (let z = start; z <= fineTop; z += step) levels.push(z);
+  if (zMax <= COARSE_FROM_M) return levels;
+  // A site above the cap still gets its first line, then a 500 m step.
+  if (start > COARSE_FROM_M && start <= zMax) levels.push(start);
+  const origin = Math.max(start, COARSE_FROM_M);
+  for (let z = Math.ceil((origin + 1) / ALT_STEP_ABOVE_M) * ALT_STEP_ABOVE_M; z <= zMax; z += ALT_STEP_ABOVE_M) {
+    levels.push(z);
+  }
   return levels;
 }
 
@@ -146,38 +160,72 @@ export function windRgb(kmh: number): RGB {
   return rampRgb(WIND_STOPS, kmh, [46, 168, 88]);
 }
 
-const PAPER: RGB = [255, 255, 255];
+const LIGHT_PAPER: RGB = [255, 255, 255];
+/** Matches --paper in the dark theme, so an untinted cell is the chart itself. */
+const DARK_PAPER: RGB = [28, 25, 22];
+const LIGHT_VEIL: RGB = [148, 150, 154];
+const DARK_VEIL: RGB = [84, 88, 94];
+
+/** Same hues as the light bands, held dark enough for light figures. */
+const DARK_BANDS: readonly { from: number; to: number; wash: RGB; solid: RGB }[] = [
+  { from: 0.5, to: 1.2, wash: [22, 78, 66], solid: [36, 92, 82] },
+  { from: 1.2, to: 2.2, wash: [92, 64, 14], solid: [118, 82, 28] },
+  { from: 2.2, to: 3.5, wash: [100, 36, 28], solid: [138, 54, 44] },
+  { from: 3.5, to: 6, wash: [74, 32, 98], solid: [100, 58, 120] },
+];
+
+export type ChartTone = "light" | "dark";
+
+function tonePaint(tone: ChartTone) {
+  return tone === "dark"
+    ? { paper: DARK_PAPER, bands: DARK_BANDS, veil: DARK_VEIL }
+    : { paper: LIGHT_PAPER, bands: THERMAL_BANDS, veil: LIGHT_VEIL };
+}
+
 /** Updraft where the first teal wash is reached. Below it the tint fades out. */
 const TRACE_MS = 0.5;
 
-export function thermalRgb(wMs: number): RGB {
-  const first = THERMAL_BANDS[0];
-  const last = THERMAL_BANDS[THERMAL_BANDS.length - 1];
-  if (!first || !last || wMs <= 0) return PAPER;
+export function thermalRgb(wMs: number, tone: ChartTone = "light"): RGB {
+  const { paper, bands } = tonePaint(tone);
+  const first = bands[0];
+  const last = bands[bands.length - 1];
+  if (!first || !last || wMs <= 0) return paper;
   if (wMs < TRACE_MS) {
     // Squared so 0.1 m/s is about 4% of the way to teal: a trace, not a tint.
     const t = (wMs / TRACE_MS) ** 2;
-    return lerpRgb(PAPER, first.wash, t);
+    return lerpRgb(paper, first.wash, t);
   }
   if (wMs >= last.to) return last.solid;
-  const band = THERMAL_BANDS.find((item) => wMs < item.to) ?? last;
+  const band = bands.find((item) => wMs < item.to) ?? last;
   const span = band.to - band.from;
-  const t = span <= 0 ? 1 : (wMs - band.from) / span;
-  return lerpRgb(band.wash, band.solid, Math.min(1, Math.max(0, t)));
+  const raw = span <= 0 ? 1 : (wMs - band.from) / span;
+  // Reach the full hue early, so a modest climb is not a pale tint.
+  const t = Math.min(1, Math.max(0, raw)) ** 0.65;
+  return lerpRgb(band.wash, band.solid, t);
 }
 
-export function cellBackground(wMs: number, cloud: number | null): RGB {
-  let rgb: RGB = PAPER;
-  if (wMs > 0) rgb = thermalRgb(wMs);
+export function cellBackground(wMs: number, cloud: number | null, tone: ChartTone = "light"): RGB {
+  const { paper, veil } = tonePaint(tone);
+  let rgb: RGB = paper;
+  if (wMs > 0) rgb = thermalRgb(wMs, tone);
   if (cloud != null && cloud >= CLOUD_VEIL_PCT) {
-    const fog = 0.14 + 0.36 * ((cloud - CLOUD_VEIL_PCT) / (100 - CLOUD_VEIL_PCT));
-    rgb = lerpRgb(rgb, [148, 150, 154], fog);
+    const reach = tone === "dark" ? 0.22 : 0.36;
+    const fog = 0.14 + reach * ((cloud - CLOUD_VEIL_PCT) / (100 - CLOUD_VEIL_PCT));
+    rgb = lerpRgb(rgb, veil, fog);
   }
   return rgb;
 }
 
 export function cssRgb(rgb: RGB): string {
   return `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]})`;
+}
+
+/** Legend stops for one chart tone: a wash and a solid per thermal band. */
+export function thermalStops(tone: ChartTone = "light"): readonly [number, RGB][] {
+  return tonePaint(tone).bands.flatMap((band) => [
+    [band.from, band.wash] as [number, RGB],
+    [band.to, band.solid] as [number, RGB],
+  ]);
 }
 
 /**

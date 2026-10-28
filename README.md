@@ -1,4 +1,4 @@
-# Weather4Paragliding (w4p)
+# Finesse des particules (w4p)
 
 Frontend-only app — Vite + React 19 + TypeScript. No backend.
 Weather model data (Météo-France AROME/ARPEGE, MeteoSwiss ICON-CH1, DWD
@@ -99,7 +99,7 @@ restarts the services one by one.
 
 ## License
 
-Weather4Paragliding is licensed under the
+Finesse des particules is licensed under the
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only).
 
 Copyleft: any fork or modified version — whether redistributed or hosted as a

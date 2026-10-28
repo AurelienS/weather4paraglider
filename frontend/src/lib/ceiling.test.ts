@@ -44,6 +44,12 @@ describe("cloud ceiling", () => {
   it("ignores a clear sky and a veil too thin to paint", () => {
     const hours = [hour([[3000, 80], [5600, 0], [9000, 9], [11000, null]])];
     expect(cloudTopM(hours)).toBe(3000);
+    expect(canSeeHigher(hours)).toBe(true);
+    expect(altitudeCeiling(hours, true)).toBe(CLOUD_INFLUENCE_Z_MAX_M);
+  });
+
+  it("stays closed when the model never measures above 5 km", () => {
+    const hours = [hour([[3000, 80], [4800, 40]])];
     expect(canSeeHigher(hours)).toBe(false);
     expect(altitudeCeiling(hours, true)).toBe(FLYING_Z_MAX_M);
   });

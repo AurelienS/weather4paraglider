@@ -2,10 +2,11 @@ import {
   arrowInk,
   cellBackground,
   cssRgb,
-  THERMAL_STOPS,
+  thermalStops,
   windRgb,
 } from "../lib/windgram";
 import { useI18n } from "../i18nContext";
+import { useStore } from "../stores";
 import { WindNeedle } from "./WindArrow";
 
 const REPO = "https://github.com/AurelienS/weather4paraglider";
@@ -64,6 +65,7 @@ const DEMO_W = LABEL_W + DEMO_HOURS.length * CELL_W;
 const DEMO_H = HEAD_H + DEMO_ROWS.length * CELL_H + FOOT_H;
 
 function GramDemo() {
+  const tone = useStore((s) => s.theme);
   return (
     <svg
       className="gram-demo"
@@ -94,7 +96,7 @@ function GramDemo() {
           {row.cells.map((c, i) => {
             const x = LABEL_W + i * CELL_W;
             const y = HEAD_H + r * CELL_H;
-            const bg = cellBackground(c.w, c.cloud ?? null);
+            const bg = cellBackground(c.w, c.cloud ?? null, tone);
             const ink = arrowInk(windRgb(c.kmh), bg);
             return (
               <g key={i}>
@@ -168,11 +170,13 @@ function GramDemo() {
 }
 
 function GramScale() {
+  const tone = useStore((s) => s.theme);
+  const stops = thermalStops(tone);
   const wind = [0, 8, 12, 22, 32, 42, 55]
     .map((v) => `${cssRgb(windRgb(v))} ${(v / 55) * 100}%`)
     .join(", ");
-  const liftMax = THERMAL_STOPS[THERMAL_STOPS.length - 1]?.[0] ?? 1;
-  const lift = THERMAL_STOPS.map(([v, rgb]) => `${cssRgb(rgb)} ${(v / liftMax) * 100}%`).join(", ");
+  const liftMax = stops[stops.length - 1]?.[0] ?? 1;
+  const lift = stops.map(([v, rgb]) => `${cssRgb(rgb)} ${(v / liftMax) * 100}%`).join(", ");
   return (
     <div className="gram-scale" aria-hidden="true">
       <div className="gs-row">

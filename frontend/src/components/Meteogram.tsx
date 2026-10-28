@@ -4,18 +4,20 @@ import { sampleAt, sampleDir } from "../lib/cursor";
 import { compass, hourOfDay } from "../lib/format";
 import { type Dict, type Lang } from "../lib/i18n";
 import { useI18n } from "../i18nContext";
+import { useStore } from "../stores";
 import {
   cblSeries,
-  cloudDecks,
-  cloudMaxM,
+  cloudBands,
+  cloudShadeStops,
+  METEO_Z_MAX_M,
   meteoHourTicks,
   PRECIP_SCALE_MM,
   smoothClosedPath,
   smoothPath,
   spreadLabels,
-  surfaceTd,
   tempRange,
   windMax,
+  type CloudBand,
   type XY,
 } from "../lib/meteogram";
 
@@ -27,11 +29,11 @@ type Props = {
 };
 
 // viewBox geometry: ONE shared plot with a single altitude axis — 0 m sits
-// on the chart's bottom line, the same line the wind area and the rain
-// bars stand on. Clouds and the convective layer use the real altitude
+// on the chart's bottom line, the same line the rain bars stand on.
+// Clouds and the convective layer use the real altitude
 // scale; temperature and wind are curves with their values riding them.
 const VB_W = 768;
-const PAD_L = 34;
+const PAD_L = 46;
 // wide right margin: the curve names sit outside the plot, level with the
 // last point of their curve (the convective layer may end well before)
 const PAD_R = 92;
@@ -39,14 +41,13 @@ const PLOT_W = VB_W - PAD_L - PAD_R;
 const SLOT_W = PLOT_W / 24;
 
 const PLOT_Y = 12;
-const PLOT_H = 196;
+// Tall enough that a 0–10 km axis is not crushed into the old 5 km frame.
+const PLOT_H = 280;
 const PLOT_B = PLOT_Y + PLOT_H; // the 0 line: ground, wind 0, rain 0
-const ARROW_Y = PLOT_B + 8;
-const ARROW_H = 14;
-const TIME_Y = ARROW_Y + ARROW_H + 8;
+const TIME_Y = PLOT_B + 18;
 const VB_H = TIME_Y + 14;
 
-// wind fills the bottom 45% of the plot, temperature lives at 30–62% height
+// wind and gust share the bottom 45% of the plot, temperature lives at 30–62% height
 const WIND_SPAN = PLOT_H * 0.45;
 const TEMP_TOP = PLOT_Y + PLOT_H * 0.3;
 const TEMP_BOT = PLOT_Y + PLOT_H * 0.62;
@@ -55,8 +56,8 @@ const xOf = (hour: number) => PAD_L + (hour + 0.5) * SLOT_W;
 
 /**
  * meteoblue-style compact meteogram: one shared plot, one altitude axis.
- * Rain bars stand on the 0 m bottom line, the wind area rises from the
- * same line, gray decks and the yellow convective-top line sit at their
+ * Rain bars stand on the 0 m bottom line. Wind and gust are lines on that
+ * same scale. Gray decks and the yellow convective-top line sit at their
  * real altitude. Every curve carries its name and its values, written in
  * the curve's own color. All panels share the 00:00–24:00 axis of the day.
  */
@@ -64,6 +65,7 @@ type MeteoCursor = { x: number; hour: number; left: number; top: number; flip: b
 
 export function Meteogram({ hours, elevationM, compact }: Props) {
   const { t, lang } = useI18n();
+  const tone = useStore((s) => s.theme);
   const uid = useId().replace(/:/g, "");
   const plotRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<MeteoCursor | null>(null);
@@ -88,11 +90,9 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
     });
   }
 
-  const mMax = useMemo(() => {
-    const cbl = Math.max(0, ...cblSeries(hours, elevationM).map((p) => p.zM));
-    return Math.max(cloudMaxM(hours), Math.ceil(cbl / 500) * 500);
-  }, [hours, elevationM]);
+  const mMax = METEO_Z_MAX_M;
 
+  const bands = useMemo(() => cloudBands(hours, elevationM), [hours, elevationM]);
   const tR = useMemo(() => tempRange(hours), [hours]);
   const wMax = useMemo(() => windMax(hours), [hours]);
   const cbl = useMemo(() => cblSeries(hours, elevationM), [hours, elevationM]);
@@ -111,10 +111,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
   const tempPts = hours
     .filter((h) => h.surface.t2m != null)
     .map((h) => ({ x: xOf(hourOfDay(h.time)), y: tToY(h.surface.t2m!) }));
-  const tdPts = hours
-    .map((h) => ({ h, td: [...h.profile].sort((a, b) => a.z - b.z)[0]?.td ?? null }))
-    .filter((p): p is { h: Hour; td: number } => p.td != null)
-    .map((p) => ({ x: xOf(hourOfDay(p.h.time)), y: tToY(p.td) }));
   const windPts = hours
     .filter((h) => h.surface.wind10 != null)
     .map((h) => ({ x: xOf(hourOfDay(h.time)), y: wToY(h.surface.wind10!) }));
@@ -124,10 +120,33 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
   const cblPts = cbl.map((p) => ({ x: xOf(p.hour), y: mToY(p.zM) }));
 
   const curve = (pts: XY[]) => (pts.length >= 2 ? smoothPath(pts) : "");
-  const windArea =
-    windPts.length >= 2
-      ? `${smoothPath(windPts)} L ${PAD_L + PLOT_W},${PLOT_B} L ${PAD_L},${PLOT_B} Z`
-      : null;
+  // Soft closed outline. A single hour is a rounded slot; a run covers every
+  // hour, including the half slot outside the first and last centres.
+  const outlineOf = (band: CloudBand): XY[] => {
+    const yOf = (m: number) => mToY(m);
+    const first = band[0]!;
+    const last = band[band.length - 1]!;
+    if (band.length === 1) {
+      const x = xOf(first.hour);
+      const half = SLOT_W / 2;
+      return [
+        { x: x - half, y: yOf(first.baseM) },
+        { x: x + half, y: yOf(first.baseM) },
+        { x: x + half, y: yOf(first.topM) },
+        { x: x - half, y: yOf(first.topM) },
+      ];
+    }
+    const x0 = xOf(first.hour) - SLOT_W / 2;
+    const xN = xOf(last.hour) + SLOT_W / 2;
+    return [
+      { x: x0, y: yOf(first.baseM) },
+      ...band.map((p) => ({ x: xOf(p.hour), y: yOf(p.baseM) })),
+      { x: xN, y: yOf(last.baseM) },
+      { x: xN, y: yOf(last.topM) },
+      ...[...band].reverse().map((p) => ({ x: xOf(p.hour), y: yOf(p.topM) })),
+      { x: x0, y: yOf(first.topM) },
+    ];
+  };
 
   const rainBars = hours
     .filter((h) => (h.surface.precip ?? 0) > 0)
@@ -140,7 +159,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
   const series = (pick: (h: Hour) => number | null) =>
     hours.map((h) => ({ at: hourOfDay(h.time), value: pick(h) }));
   const tNow = cursor ? sampleAt(series((h) => h.surface.t2m), cursor.hour) : null;
-  const tdNow = cursor ? sampleAt(series(surfaceTd), cursor.hour) : null;
   const windNow = cursor ? sampleAt(series((h) => h.surface.wind10), cursor.hour) : null;
   const dirNow = cursor ? sampleDir(series((h) => h.surface.dir10), cursor.hour) : null;
   const gustNow = cursor ? sampleAt(series((h) => h.surface.gust10), cursor.hour) : null;
@@ -179,17 +197,37 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
           <clipPath id={`meteo-plot-${uid}`}>
             <rect x={PAD_L} y={PLOT_Y} width={PLOT_W} height={PLOT_H} />
           </clipPath>
-          <linearGradient
-            id={`wind-fill-${uid}`}
-            x1="0"
-            y1={PLOT_Y}
-            x2="0"
-            y2={PLOT_B}
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor="#2f7d3e" stopOpacity="0.02" />
-            <stop offset="100%" stopColor="#2f7d3e" stopOpacity="0.38" />
-          </linearGradient>
+          {bands.map((band, i) => {
+            const x0 = xOf(band[0]!.hour) - SLOT_W / 2;
+            const x1 = xOf(band[band.length - 1]!.hour) + SLOT_W / 2;
+            const span = Math.max(x1 - x0, 1);
+            return (
+              <linearGradient
+                key={`shade-${i}`}
+                id={`cloud-shade-${uid}-${i}`}
+                className="meteo-cloud-shade"
+                x1={x0}
+                x2={x1}
+                y1="0"
+                y2="0"
+                gradientUnits="userSpaceOnUse"
+              >
+                {cloudShadeStops(
+                  band.map((p) => ({ x: xOf(p.hour), cover: p.cover })),
+                  x0,
+                  span,
+                  tone,
+                ).map((stop, j) => (
+                  <stop
+                    key={j}
+                    offset={stop.offset}
+                    stopColor={stop.color}
+                    stopOpacity={1}
+                  />
+                ))}
+              </linearGradient>
+            );
+          })}
         </defs>
         <rect x="0" y="0" width={VB_W} height={VB_H} className="meteo-bg" />
 
@@ -229,51 +267,36 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
         />
 
         <g clipPath={`url(#meteo-plot-${uid})`}>
-          {/* continuous cloud decks stacked above the model's cloud base:
-              smooth soft bands (Catmull-Rom), thickness follows the cover */}
-          {[0, 1, 2].map((layer) => {
-            type Edge = { x: number; bY: number; tY: number };
-            const pts: (Edge | null)[] = hours.map((h) => {
-              const d = cloudDecks(h)[layer];
-              return d
-                ? { x: xOf(hourOfDay(h.time)), bY: mToY(d.baseM), tY: mToY(d.topM) }
-                : null;
-            });
-            const runs: Edge[][] = [];
-            let cur: Edge[] = [];
-            for (const p of pts) {
-              if (p) cur.push(p);
-              else if (cur.length > 0) {
-                runs.push(cur);
-                cur = [];
-              }
-            }
-            if (cur.length > 0) runs.push(cur);
-            return runs.map((run, r) => {
-              // one closed soft outline: bottom edge left→right, top edge
-              // right→left, every corner rounded (ends included)
-              const outline: XY[] = [
-                ...run.map((p): XY => ({ x: p.x, y: p.bY })),
-                ...run
-                  .slice()
-                  .reverse()
-                  .map((p): XY => ({ x: p.x, y: p.tY })),
-              ];
-              return (
-                <path
-                  key={`${layer}-${r}`}
-                  d={smoothClosedPath(outline)}
-                  className="meteo-cloud"
-                  opacity={0.5}
-                />
-              );
-            });
+          {/* One soft shape per continuous layer. The gray eases from hour
+              to hour: pale when thin, dark when overcast. */}
+          {bands.map((band, i) => {
+            const d = smoothClosedPath(outlineOf(band));
+            if (!d) return null;
+            return (
+              <path
+                key={i}
+                d={d}
+                className="meteo-cloud"
+                style={{ fill: `url(#cloud-shade-${uid}-${i})` }}
+              />
+            );
           })}
 
-          {/* wind: green area rising from the 0 line + gust line above */}
-          {windArea ? (
-            <path d={windArea} className="meteo-wind" fill={`url(#wind-fill-${uid})`} />
-          ) : null}
+          {/* A hairline every 1000 m, over the clouds and under the curves. */}
+          {Array.from({ length: 9 }, (_, i) => (i + 1) * 1000)
+            .filter((m) => m !== mMax / 2)
+            .map((m) => (
+              <line
+                key={`km-${m}`}
+                x1={PAD_L}
+                x2={PAD_L + PLOT_W}
+                y1={mToY(m)}
+                y2={mToY(m)}
+                className="meteo-grid-minor"
+              />
+            ))}
+
+          {curve(windPts) ? <path d={curve(windPts)} className="meteo-wind" /> : null}
           {curve(gustPts) ? <path d={curve(gustPts)} className="meteo-gust" /> : null}
 
           {/* rain: slim bars standing on the 0 line */}
@@ -289,8 +312,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
             />
           ))}
 
-          {/* temperature + dew point curves in their own band */}
-          {curve(tdPts) ? <path d={curve(tdPts)} className="meteo-td" /> : null}
           {curve(tempPts) ? <path d={curve(tempPts)} className="meteo-temp-glow" /> : null}
           {curve(tempPts) ? <path d={curve(tempPts)} className="meteo-temp" /> : null}
 
@@ -310,11 +331,28 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
         {/* altitude axis (left, ticks): kept for clouds + convective layer;
             the right margin belongs to the curve names */}
         {[0, mMax / 2, mMax].map((m) => (
-          <text key={m} x={PAD_L - 6} y={mToY(m) + 3.5} className="meteo-tx meteo-tx-l">
+          <text
+            key={m}
+            x={PAD_L - 6}
+            y={m === mMax ? mToY(m) + 12 : mToY(m) + 3.5}
+            className="meteo-tx meteo-tx-l"
+          >
             {Math.round(m)}
           </text>
         ))}
-        <text x={PAD_L - 6} y={PLOT_Y + 2} className="meteo-unit meteo-tx-l">
+        {Array.from({ length: 9 }, (_, i) => (i + 1) * 1000)
+          .filter((m) => m !== mMax / 2)
+          .map((m) => (
+            <text
+              key={`km-tx-${m}`}
+              x={PAD_L - 6}
+              y={mToY(m) + 2.8}
+              className="meteo-tx-minor meteo-tx-l"
+            >
+              {m}
+            </text>
+          ))}
+        <text x={PAD_L - 6} y={PLOT_Y - 3} className="meteo-unit meteo-tx-l">
           m
         </text>
 
@@ -361,7 +399,7 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
           ) : null,
         )}
 
-        {/* wind values inside the area, in the wind color */}
+        {/* wind values under the wind line, in the wind color */}
         {hours.map((h, i) =>
           h.surface.wind10 != null && i % labelEvery === 0 ? (
             <text
@@ -375,16 +413,13 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
           ) : null,
         )}
 
-        {/* direction arrows below the plot, pointing downwind */}
+        {/* Direction on the wind line: one open ink chevron per hour, no text. */}
         {hours.map((h) => {
-          if (h.surface.dir10 == null || !ticks.includes(hourOfDay(h.time))) {
-            return null;
-          }
+          if (h.surface.dir10 == null || h.surface.wind10 == null) return null;
           const cx = xOf(hourOfDay(h.time));
-          const cy = ARROW_Y + ARROW_H / 2;
-          const speed = h.surface.wind10 ?? 0;
-          if (speed < 1.5) {
-            return <circle key={h.time} cx={cx} cy={cy} r={2.2} className="meteo-calm" />;
+          const cy = wToY(h.surface.wind10);
+          if (h.surface.wind10 < 1.5) {
+            return <circle key={h.time} cx={cx} cy={cy} r={1.8} className="meteo-calm" />;
           }
           return (
             <g
@@ -392,8 +427,8 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
               transform={`translate(${cx} ${cy}) rotate(${h.surface.dir10 + 180})`}
               className="meteo-arrow"
             >
-              <line x1={0} y1={-5.5} x2={0} y2={5.5} />
-              <path d="M 0 -6.5 L 2.8 -2.6 L -2.8 -2.6 Z" />
+              <line x1="0" y1="6.6" x2="0" y2="-1.2" />
+              <polyline points="-2.7,-1.45 0,-8.1 2.7,-1.45" />
             </g>
           );
         })}
@@ -406,9 +441,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
           const wants: Array<{ key: string; y: number; text: string; cls: string }> = [];
           if (cblPts.length > 0) {
             wants.push({ key: "cbl", y: cblPts[cblPts.length - 1]!.y + 3, text: t.meteoLblCbl, cls: "meteo-lbl-cbl" });
-          }
-          if (tdPts.length > 0) {
-            wants.push({ key: "td", y: tdPts[tdPts.length - 1]!.y + 3, text: t.meteoLblTd, cls: "meteo-lbl-td" });
           }
           if (windPts.length > 0) {
             wants.push({ key: "wind", y: windPts[windPts.length - 1]!.y + 3, text: t.meteoLblWind, cls: "meteo-lbl-wind" });
@@ -440,9 +472,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
             {tNow != null ? (
               <circle cx={cursor.x} cy={tToY(tNow)} r="3.4" className="cursor-dot t" />
             ) : null}
-            {tdNow != null ? (
-              <circle cx={cursor.x} cy={tToY(tdNow)} r="3.1" className="cursor-dot td" />
-            ) : null}
             {windNow != null ? (
               <circle cx={cursor.x} cy={wToY(windNow)} r="3.1" className="cursor-dot wind" />
             ) : null}
@@ -459,7 +488,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
         <MeteoCard
           hour={cursor.hour}
           t2m={tNow}
-          td={tdNow}
           wind={windNow}
           dir={dirNow}
           gust={gustNow}
@@ -481,7 +509,6 @@ export function Meteogram({ hours, elevationM, compact }: Props) {
 function MeteoCard({
   hour,
   t2m,
-  td,
   wind,
   dir,
   gust,
@@ -496,7 +523,6 @@ function MeteoCard({
 }: {
   hour: number;
   t2m: number | null;
-  td: number | null;
   wind: number | null;
   dir: number | null;
   gust: number | null;
@@ -520,7 +546,7 @@ function MeteoCard({
     <div className={flip ? "hover-card is-flip" : "hover-card"} style={style}>
       <strong>{clockLabel(hour)}</strong>
       <span>
-        T {t2m == null ? "—" : `${t2m.toFixed(1)}°`} · Td {td == null ? "—" : `${td.toFixed(1)}°`}
+        T {t2m == null ? "—" : `${t2m.toFixed(1)}°`}
       </span>
       <span>
         {windTxt}

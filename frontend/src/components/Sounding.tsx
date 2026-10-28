@@ -7,7 +7,6 @@ import { sampleAt, sampleDir } from "../lib/cursor";
 import { compass } from "../lib/format";
 import { interpolate, type Dict, type Lang } from "../lib/i18n";
 import { smoothPath } from "../lib/meteogram";
-import { windLabelMask } from "../lib/windmark";
 import { useI18n } from "../i18nContext";
 
 const VB_W = 920;
@@ -18,9 +17,6 @@ const GAP = 28;
 const DALR = 9.8;
 /** Same calm threshold as the windgram needle: below this, direction is noise. */
 const CALM_WIND_KMH = 1.5;
-/** Compass letters need this much vertical room or they pile up. */
-const WIND_LABEL_GAP = 14;
-
 type Props = {
   hour: Hour;
   elevationM: number;
@@ -258,31 +254,19 @@ export function Sounding({ hour, elevationM, zMax = FLYING_Z_MAX_M, lift = null 
           <g clipPath={`url(#wind-${uid})`}>
             {layout.windPath ? <path d={layout.windPath} className="curve-wind" /> : null}
           </g>
-          {layout.windDots.map((d, i) => {
+          {layout.windDots.map((d) => {
             const dir = d.dir;
             const aimed = dir != null && d.wind >= CALM_WIND_KMH;
-            const label = aimed && layout.windLabels[i] === true;
-            const flip = layout.windRight - d.x < 36;
             return (
               <g key={`wdot-${d.z}`}>
                 {aimed ? (
                   <g className="wind-dir" transform={`rotate(${dir + 180} ${d.x} ${d.y})`}>
-                    <circle className="wind-dir-hole" cx={d.x} cy={d.y} r="2.6" />
+                    <circle className="wind-dir-hole" cx={d.x} cy={d.y} r="3.2" />
                     <path d={headingArrow(d.x, d.y)} className="wind-dir-arrow" />
                   </g>
                 ) : (
                   <circle cx={d.x} cy={d.y} r="2.2" className="wind-dot" />
                 )}
-                {label ? (
-                  <text
-                    className="wind-dir-label"
-                    x={d.x + (flip ? -8 : 8)}
-                    y={d.y + 3}
-                    textAnchor={flip ? "end" : "start"}
-                  >
-                    {compass(dir, lang)}
-                  </text>
-                ) : null}
               </g>
             );
           })}
@@ -482,13 +466,13 @@ function ZHinge({
 /** Tip points up, before the group rotates it onto the heading. */
 function headingArrow(x: number, y: number): string {
   const pts: ReadonlyArray<readonly [number, number]> = [
-    [0, -6.4],
-    [3.6, -1.2],
-    [1.25, -1.6],
-    [1.25, 5],
-    [-1.25, 5],
-    [-1.25, -1.6],
-    [-3.6, -1.2],
+    [0, -11.5],
+    [6.5, -2.2],
+    [2.25, -2.9],
+    [2.25, 9],
+    [-2.25, 9],
+    [-2.25, -2.9],
+    [-6.5, -2.2],
   ];
   const cmds = pts.map(([dx, dy], i) => {
     const px = (x + dx).toFixed(2);
@@ -614,10 +598,6 @@ function buildLayout(hour: Hour, elevationM: number, zCap: number) {
     tdDots: tdPts,
     windPath: windPts.length >= 2 ? smoothPath(windPts) : "",
     windDots: windPts,
-    windLabels: windLabelMask(
-      windPts.map((p) => p.y),
-      WIND_LABEL_GAP,
-    ),
     dalrX,
     isoPaths,
     isoLabels,

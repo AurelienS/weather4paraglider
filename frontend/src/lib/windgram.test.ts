@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  altitudeLevels,
   arrowEdge,
   arrowInk,
   cellBackground,
@@ -11,6 +12,18 @@ import {
 } from "./windgram";
 
 const LEVELS = [3000, 2750, 2500, 2250, 2000];
+
+function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+  const linear = (channel: number) => {
+    const s = channel / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = (rgb: [number, number, number]) =>
+    0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+  const hi = Math.max(lum(a), lum(b));
+  const lo = Math.min(lum(a), lum(b));
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 describe("iso0CellZ", () => {
   it("marks the row below the lowest sub-zero cell", () => {
@@ -68,6 +81,47 @@ describe("iso0CellZ", () => {
     expect(after[0]).toBeGreaterThan(after[2] + 30);
   });
 
+  it("keeps the four hues apart on a dark chart", () => {
+    const teal = thermalRgb(0.8, "dark");
+    const gold = thermalRgb(1.8, "dark");
+    const red = thermalRgb(3, "dark");
+    const violet = thermalRgb(6, "dark");
+    expect(teal[1]).toBeGreaterThan(teal[0]);
+    expect(gold[0]).toBeGreaterThan(gold[2] + 20);
+    expect(red[0]).toBeGreaterThan(red[1] + 20);
+    expect(violet[2]).toBeGreaterThan(violet[1]);
+  });
+
+  it("keeps dark figures readable on every light cell", () => {
+    const ink: [number, number, number] = [28, 25, 21];
+    for (const w of [0, 0.5, 1, 1.5, 2, 2.5, 3.2, 4.5, 6]) {
+      const bg = cellBackground(w, 0);
+      expect(contrastRatio(ink, bg), `ink ${w} ${bg.join(",")}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps light figures readable on every dark cell", () => {
+    const ink: [number, number, number] = [244, 239, 230];
+    const gust: [number, number, number] = [255, 208, 198];
+    for (const w of [0, 0.1, 0.5, 1, 1.5, 2, 2.5, 3.2, 4.5, 6]) {
+      for (const cloud of [0, 40, 100]) {
+        const bg = cellBackground(w, cloud, "dark");
+        expect(contrastRatio(ink, bg), `ink ${w} cloud ${cloud} ${bg.join(",")}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(gust, bg), `gust ${w} cloud ${cloud} ${bg.join(",")}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it("starts a climb in a hue you can see", () => {
+    const teal = thermalRgb(0.5);
+    const gold = thermalRgb(1.2);
+    expect(Math.max(...teal) - Math.min(...teal)).toBeGreaterThan(40);
+    expect(teal[1]).toBeLessThan(215);
+    expect(Math.max(...gold) - Math.min(...gold)).toBeGreaterThan(80);
+    const dark = thermalRgb(0.5, "dark");
+    expect(Math.max(...dark) - Math.min(...dark)).toBeGreaterThan(40);
+  });
+
   it("keeps a trace of lift almost white", () => {
     expect(cellBackground(0, 0)).toEqual([255, 255, 255]);
     const trace = cellBackground(0.1, 0);
@@ -81,6 +135,38 @@ describe("iso0CellZ", () => {
   it("handles an empty grid", () => {
     const z = iso0CellZ([], [], 12, 1500);
     expect(z).toBeNull();
+  });
+});
+
+describe("altitudeLevels", () => {
+  it("keeps a 250 m step up to 5000 m", () => {
+    const levels = altitudeLevels(1696, 5000);
+    expect(levels[0]).toBe(1750);
+    expect(levels.at(-1)).toBe(5000);
+    expect(levels).toContain(4750);
+    expect(levels).not.toContain(5250);
+    const steps = levels.slice(1).map((z, i) => z - (levels[i] ?? z));
+    expect(steps.every((step) => step === 250)).toBe(true);
+  });
+
+  it("steps 500 m above 5000 m", () => {
+    const levels = altitudeLevels(1696, 10000);
+    expect(levels.filter((z) => z > 5000)).toEqual([
+      5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000,
+    ]);
+    expect(levels).toContain(5000);
+    expect(levels).toContain(4750);
+    expect(levels).not.toContain(5250);
+  });
+
+  it("stops on the last 500 m line that still fits under the cap", () => {
+    expect(altitudeLevels(1696, 8100).filter((z) => z > 5000)).toEqual([
+      5500, 6000, 6500, 7000, 7500, 8000,
+    ]);
+  });
+
+  it("still starts just above a site higher than 5000 m", () => {
+    expect(altitudeLevels(5200, 10000).slice(0, 4)).toEqual([5250, 5500, 6000, 6500]);
   });
 });
 
@@ -108,6 +194,20 @@ describe("arrowInk", () => {
   it("measures black and white a full step apart", () => {
     expect(colorDistance([255, 255, 255], [255, 255, 255])).toBe(0);
     expect(colorDistance([255, 255, 255], [0, 0, 0])).toBeGreaterThan(0.9);
+  });
+
+  it("stands off every dark thermal tint, including the cloud veil", () => {
+    for (const kmh of winds) {
+      for (const w of lifts) {
+        for (const cloud of clouds) {
+          const bg = cellBackground(w, cloud, "dark");
+          const ink = arrowInk(windRgb(kmh), bg);
+          expect(colorDistance(ink, bg), `${kmh} km/h on ${w} m/s, cloud ${cloud}`).toBeGreaterThanOrEqual(
+            0.16,
+          );
+        }
+      }
+    }
   });
 
   it("stands off every thermal tint, including the cloud veil", () => {

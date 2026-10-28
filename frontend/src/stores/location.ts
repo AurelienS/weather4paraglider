@@ -1,13 +1,16 @@
 
 import { DEMO_POINT } from "../lib/format";
 import { placeText, reverseGeocode } from "../lib/geocode";
+import { placeNameForPoint, rememberPlaceName, isCoordinateLabel } from "../lib/placeLabel";
 import { DEFAULT_MODEL } from "../api/models";
 import type { Point } from "./types";
+import { BOOTSTRAP } from "./url";
 import type { SliceCreator } from "./index";
 
 export type LocationSlice = {
   point: Point;
-  /** Human-readable place label; null until known (reverse geocoding). */
+  /** Human-readable place label. Restored from the last visit, a favorite
+   * or a recent place; otherwise filled by reverse geocoding. */
   place: string | null;
 
   /** Reverse geocode the current point once, so the header shows a place
@@ -26,7 +29,7 @@ let placeCtl: AbortController | null = null;
 
 export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
   point: { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon },
-  place: null,
+  place: placeNameForPoint(BOOTSTRAP.point.lat, BOOTSTRAP.point.lon),
 
   ensurePlace: () => {
     if (get().place != null) return;
@@ -36,8 +39,12 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
     const { lat, lon } = get().point;
     reverseGeocode(lat, lon, ctl.signal)
       .then((p) => {
-        if (ctl.signal.aborted) return;
-        if (p) set({ place: placeText(p) });
+        if (ctl.signal.aborted || !p) return;
+        const current = get().point;
+        if (current.lat !== lat || current.lon !== lon || get().place != null) return;
+        const label = placeText(p);
+        rememberPlaceName(lat, lon, label);
+        set({ place: label });
       })
       .catch(() => {
         // offline or Photon down: keep the coordinate fallback
@@ -47,16 +54,18 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
   submitPlace: (lat, lon, label) => {
     const { point } = get();
     const same = lat === point.lat && lon === point.lon;
-    set({ loading: true, error: null, place: label ?? null });
-    if (!same) {
-      set({ point: { lat, lon } });
-      get().ensurePlace();
-    }
+    const text = label?.trim() ?? "";
+    const name = text && !isCoordinateLabel(text) ? text : null;
+    if (name) placeCtl?.abort();
+    set({ loading: true, error: null, place: name });
+    if (name) rememberPlaceName(lat, lon, name);
+    if (!same) set({ point: { lat, lon } });
+    if (name == null) get().ensurePlace();
     // every explicit place selection feeds the main page recent list
     get().addRecentPlace({
       lat,
       lon,
-      label: label ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+      label: name ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
     });
     get().loadMain();
   },
@@ -64,7 +73,7 @@ export const createLocationSlice: SliceCreator<LocationSlice> = (set, get) => ({
   goHome: () => {
     set({
       point: { lat: DEMO_POINT.lat, lon: DEMO_POINT.lon },
-      place: null,
+      place: placeNameForPoint(DEMO_POINT.lat, DEMO_POINT.lon),
       modelId: DEFAULT_MODEL,
       day: null,
       hourIdx: 0,

@@ -20,11 +20,13 @@ import {
   cellBackground,
   arrowInk,
   arrowEdge,
+  type ChartTone,
   type GramCell,
 } from "../lib/windgram";
 import { thermalSpeed } from "../lib/convection";
 import { WindArrow } from "./WindArrow";
 import { useI18n } from "../i18nContext";
+import { useStore } from "../stores";
 import { interpolate, type Dict } from "../lib/i18n";
 
 /** A row or column in the chart that opens or closes a shoulder. */
@@ -64,6 +66,7 @@ export function Windgram({
   late = null,
 }: Props) {
   const { t } = useI18n();
+  const tone = useStore((s) => s.theme);
   const slots = useMemo(() => {
     const thin = (list: HourSlot[]) => (compact ? list.filter((_, i) => i % 2 === 0) : list);
     const all = slotsForDay(hours, span);
@@ -195,6 +198,7 @@ export function Windgram({
                         iso0={iso0Z[hourSlots.indexOf(slot)] === z}
                         onTip={showTip}
                         t={t}
+                        tone={tone}
                       />
                     ),
                     row === 0,
@@ -222,6 +226,7 @@ export function Windgram({
                     iso0={iso0Z[col] === elevationM}
                     onTip={showTip}
                     t={t}
+                    tone={tone}
                   />
                 );
               })}
@@ -237,7 +242,13 @@ export function Windgram({
                     key={slot.hour}
                     style={{
                       background:
-                        p > 0 ? `rgba(120, 170, 220, ${Math.min(0.2 + p / 10, 0.7)})` : undefined,
+                        p > 0
+                          ? `rgba(${tone === "dark" ? "70, 120, 170" : "120, 170, 220"}, ${
+                              tone === "dark"
+                                ? Math.min(0.16 + p / 24, 0.4)
+                                : Math.min(0.2 + p / 10, 0.7)
+                            })`
+                          : undefined,
                     }}
                     onMouseEnter={(e) => showTip(`${p.toFixed(1)} mm`, e)}
                     onMouseMove={(e) => showTip(`${p.toFixed(1)} mm`, e)}
@@ -399,12 +410,14 @@ function WindCell({
   iso0,
   onTip,
   t,
+  tone,
 }: {
   slot: HourSlot;
   cell: GramCell | undefined;
   iso0?: boolean;
   onTip: (text: string | null, ev?: MouseEvent) => void;
   t: Dict;
+  tone: ChartTone;
 }) {
   if (!slot.data) {
     return (
@@ -419,7 +432,7 @@ function WindCell({
   if (!cell || cell.belowTerrain) {
     return <td className="rock" />;
   }
-  const bg = cellBackground(cell.wMs, cell.cloud);
+  const bg = cellBackground(cell.wMs, cell.cloud, tone);
   const gust =
     cell.wind != null && cell.gust != null && cell.gust >= cell.wind + 5
       ? cell.gust

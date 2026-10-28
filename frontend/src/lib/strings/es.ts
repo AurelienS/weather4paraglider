@@ -34,7 +34,6 @@ export const es: Dict = {
   hoursLateShort: "después",
   meteoLblCloud: "Nubes",
   meteoLblCbl: "Capa convectiva",
-  meteoLblTd: "Rocío",
   meteoLblWind: "Viento",
   meteoLblGust: "Rachas",
   hourLabel: "Hora",
@@ -146,7 +145,7 @@ export const es: Dict = {
   errUnexpected: "Ha ocurrido un error inesperado.",
   guideTitle: "Primeros pasos",
   guideIntro:
-    "Weather4Paragliding convierte los modelos numéricos libres en un windgram y un " +
+    "Finesse des particules convierte los modelos numéricos libres en un windgram y un " +
     "sounding, pensado para el vuelo libre. Elige un lugar y lee el viento capa por " +
     "capa.",
   guideHowTitle: "Una sesión típica",
@@ -204,8 +203,8 @@ export const es: Dict = {
     "del ala — un cúmulo encima puede añadir más, y un viento que arrecia con la " +
     "altura puede romper la térmica. Sigue la línea azul a través de la rejilla — " +
     "la isoterma de 0 °C — para rastrear el nivel de congelación. La rejilla se " +
-    "detiene a 5 km. Si hay nube por encima, Ver más arriba abre las filas hasta " +
-    "10 km, donde una nube aún puede influir en el vuelo, y las vuelve a cerrar. Las horas van de las 8 a las 20. " +
+    "detiene a 5 km. Ver más arriba abre las filas hasta " +
+    "10 km, cada 500 m, cada día, y las vuelve a cerrar. Las horas van de las 8 a las 20. " +
     "Antes de las 8 y Después de las 20 abren el resto del día y lo vuelven a cerrar.",
     demoSpeed: "velocidad del viento, km/h",
   demoGust: "racha (solo cuando añade 5 km/h o más)",
@@ -247,7 +246,7 @@ export const es: Dict = {
     "a diferencia de algunas webs de pago que suelen mostrar una sola pasada al día.",
   guideDataTitle: "¿De dónde vienen los datos?",
   guideDataP1:
-    "Weather4Paragliding no tiene servidor propio: tu navegador llama directamente " +
+    "Finesse des particules no tiene servidor propio: tu navegador llama directamente " +
     "a la API de Open-Meteo, un servicio gratuito que redistribuye la salida bruta " +
     "de los modelos nacionales. Esta app lee AROME 2,5 km de Météo-France e " +
     "ICON D2 del DWD.",

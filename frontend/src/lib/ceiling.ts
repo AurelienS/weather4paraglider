@@ -7,7 +7,7 @@ export const FLYING_Z_MAX_M = 5000;
 /**
  * Top of the layer where cloud can still matter for a paraglider: shade,
  * overdevelopment, a ceiling. Higher than that is thin cirrus. 10 km sits
- * on the windgram's 250 m grid.
+ * on the windgram's 500 m grid.
  */
 export const CLOUD_INFLUENCE_Z_MAX_M = 10_000;
 
@@ -24,10 +24,10 @@ export function cloudTopM(hours: readonly Hour[]): number | null {
   return top;
 }
 
-/** True when the displayed hours have cloud above the flying window. */
+/** True when the displayed hours are measured above the flying window.
+ * The control is a view of that column, on every such day, cloudy or clear. */
 export function canSeeHigher(hours: readonly Hour[]): boolean {
-  const top = cloudTopM(hours);
-  return top != null && top > FLYING_Z_MAX_M;
+  return profileTopM(hours) > FLYING_Z_MAX_M;
 }
 
 function profileTopM(hours: readonly Hour[]): number {
@@ -45,8 +45,7 @@ function profileTopM(hours: readonly Hour[]): number {
  * to the highest cloud, and never past the last measured level: above that
  * level the windgram would paint the top cloud forever. */
 export function altitudeCeiling(hours: readonly Hour[], expanded: boolean): number {
-  if (!expanded) return FLYING_Z_MAX_M;
-  const top = cloudTopM(hours);
-  if (top == null || top <= FLYING_Z_MAX_M) return FLYING_Z_MAX_M;
-  return Math.min(CLOUD_INFLUENCE_Z_MAX_M, profileTopM(hours));
+  const measured = profileTopM(hours);
+  if (!expanded || measured <= FLYING_Z_MAX_M) return FLYING_Z_MAX_M;
+  return Math.min(CLOUD_INFLUENCE_Z_MAX_M, measured);
 }

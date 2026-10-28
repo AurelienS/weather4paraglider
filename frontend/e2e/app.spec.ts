@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { cloudGray } from "../src/lib/meteogram";
 import {
   blockTiles,
   mockOpenMeteo,
@@ -10,6 +11,71 @@ import {
 test.beforeEach(async ({ page }: { page: Page }) => {
   await blockTiles(page);
 });
+
+test("dark charts stay dark and the figures stay readable", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await page.locator('button[aria-label="Switch to dark theme"]').click();
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+
+  const panel = parseRgb(
+    await page.locator(".wg-panel").evaluate((el) => getComputedStyle(el).backgroundColor),
+  );
+  expect(luminance(panel)).toBeLessThan(0.08);
+
+  const cells = await page.locator(".wg td.cell").evaluateAll((nodes) =>
+    nodes.map((cell) => {
+      const figure = cell.querySelector(".n");
+      const gust = cell.querySelector(".n i");
+      return {
+        bg: getComputedStyle(cell).backgroundColor,
+        ink: figure ? getComputedStyle(figure).color : "",
+        gust: gust ? getComputedStyle(gust).color : "",
+      };
+    }),
+  );
+  expect(cells.length).toBeGreaterThan(10);
+  for (const cell of cells) {
+    const bg = parseRgb(cell.bg);
+    expect(luminance(bg)).toBeLessThan(0.2);
+    if (cell.ink) expect(contrastRatio(parseRgb(cell.ink), bg)).toBeGreaterThanOrEqual(4.5);
+    if (cell.gust) expect(contrastRatio(parseRgb(cell.gust), bg)).toBeGreaterThanOrEqual(4.5);
+  }
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
+  const sounding = parseRgb(
+    await page.locator(".sounding-frame").evaluate((el) => getComputedStyle(el).backgroundColor),
+  );
+  expect(luminance(sounding)).toBeLessThan(0.08);
+  const tick = parseRgb(
+    await page.locator(".sounding .tick-y").first().evaluate((el) => getComputedStyle(el).fill),
+  );
+  expect(contrastRatio(tick, sounding)).toBeGreaterThanOrEqual(4.5);
+  const temp = parseRgb(
+    await page.locator(".sounding .curve-t").evaluate((el) => getComputedStyle(el).stroke),
+  );
+  expect(contrastRatio(temp, sounding)).toBeGreaterThanOrEqual(3);
+
+  await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
+  const meteo = parseRgb(
+    await page.locator(".meteo-bg").evaluate((el) => getComputedStyle(el).fill),
+  );
+  expect(luminance(meteo)).toBeLessThan(0.08);
+});
+
+function luminance(rgb: [number, number, number]): number {
+  const linear = (channel: number) => {
+    const s = channel / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+}
+
+function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+  const hi = Math.max(luminance(a), luminance(b));
+  const lo = Math.min(luminance(a), luminance(b));
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 test("the theme switcher toggles and persists the theme", async ({ page }) => {
   await mockOpenMeteo(page);
@@ -291,7 +357,11 @@ test("see higher opens the charts to 10 km and closes them", async ({ page }) =>
   expect(openRow).not.toBeNull();
   expect(openRow!.height).toBeLessThanOrEqual(3);
   await expect(page.locator(".wg tbody tr th.z", { hasText: /^10250$/ })).toHaveCount(0);
-  await expect(page.locator(".wg tbody tr th.z", { hasText: /^7500$/ })).toHaveCount(1);
+  await expect(page.locator(".wg tbody tr th.z", { hasText: /^5250$/ })).toHaveCount(0);
+  await expect(page.locator(".wg tbody tr th.z", { hasText: /^4750$/ })).toHaveCount(1);
+  for (const z of [5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000]) {
+    await expect(page.locator(".wg tbody tr th.z", { hasText: new RegExp(`^${z}$`) })).toHaveCount(1);
+  }
 
   await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
   await expect(page.locator(".sounding")).toBeVisible();
@@ -313,16 +383,30 @@ test("see higher opens the charts to 10 km and closes them", async ({ page }) =>
   expect(await windgramTopM(page)).toBe(5000);
 });
 
-test("see higher stays hidden when the air above 5 km is clear", async ({ page }) => {
+test("see higher is on every day, even when the air above 5 km is clear", async ({ page }) => {
   await mockOpenMeteo(page, { clearAboveM: 5000 });
   await page.goto("/?lat=45.945&lon=6.71");
   await expect(page.locator(".wg td.cell").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "See higher" })).toHaveCount(0);
-  expect(await windgramTopM(page)).toBe(5000);
+  const days = page.locator('.seg[aria-label="Day"] button');
+  await expect(days).toHaveCount(3);
+  const lift = page.getByRole("button", { name: "See higher" });
+  for (let i = 0; i < 3; i++) {
+    await days.nth(i).click();
+    await expect(days.nth(i)).toHaveClass(/is-on/);
+    await expect(lift).toBeVisible();
+    expect(await windgramTopM(page)).toBe(5000);
+  }
+  await lift.click();
+  await expect(page.getByRole("button", { name: "Back to 5 km" })).toBeVisible();
+  expect(await windgramTopM(page)).toBe(10000);
+  await days.nth(0).click();
+  await expect(page.getByRole("button", { name: "Back to 5 km" })).toBeVisible();
+  expect(await windgramTopM(page)).toBe(10000);
 
   await page.locator('.seg[aria-label="View"] button:has-text("Sounding")').click();
   await expect(page.locator(".sounding")).toBeVisible();
-  expect(await soundingTopM(page)).toBeLessThanOrEqual(5000);
+  await expect(page.locator(".sounding .z-hinge")).toHaveAttribute("aria-label", "Back to 5 km");
+  expect(await soundingTopM(page)).toBe(10000);
 });
 
 test("switching models keeps the selected day and hour when they exist", async ({ page }) => {
@@ -503,6 +587,38 @@ test("on a phone the desk stacks and never overflows", async ({ page }) => {
   expect(soundingOverflow).toBeLessThanOrEqual(1);
 });
 
+test("a reload keeps the place name when reverse geocoding is down", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhoton(page);
+  await page.goto("/?lat=45.945&lon=6.71");
+  await expect(page.locator(".wg td.cell").first()).toBeVisible();
+  await page.locator("#place").fill("chamo");
+  await page.locator('.place-menu button:has-text("Chamonix-Mont-Blanc")').click();
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+
+  await page.unroute("**/photon.komoot.io/**");
+  await mockPhotonDown(page);
+  await page.reload();
+  await expect(page.locator(".place-line strong")).toContainText("Chamonix-Mont-Blanc");
+  await expect(page.locator(".place-line strong")).not.toContainText("°");
+});
+
+test("a saved recent place names the desk when reverse geocoding is down", async ({ page }) => {
+  await mockOpenMeteo(page);
+  await mockPhotonDown(page);
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "w4p.recentPlaces.v1",
+      JSON.stringify({
+        v: 1,
+        data: [{ lat: 43.7323, lon: 7.4277, label: "Beausoleil" }],
+      }),
+    );
+  });
+  await page.goto("/?lat=43.7323&lon=7.4277");
+  await expect(page.locator(".place-line strong")).toHaveText("Beausoleil");
+});
+
 test("reloading reads the localStorage cache without calling Open-Meteo", async ({ page }) => {
   const om = await mockOpenMeteo(page);
   await page.goto("/?lat=45.945&lon=6.71");
@@ -679,9 +795,12 @@ test("sounding labels the dry adiabat and the isotherms", async ({ page }) => {
   expect(rots).toContain(410);
   expect(rots).toContain(425);
   expect(rots.every((rot) => rot === 405 || rot === 410 || rot === 425)).toBe(true);
-  const labels = await page.locator(".sounding .wind-dir-label").allTextContents();
-  expect(labels).toContain("SW");
-  expect(labels).toContain("WSW");
+  await expect(page.locator(".sounding .wind-dir-label")).toHaveCount(0);
+  const arrowH = await page.locator(".sounding .wind-dir-arrow").first().evaluate((el) => {
+    const box = (el as SVGGraphicsElement).getBBox();
+    return box.height;
+  });
+  expect(arrowH).toBeGreaterThan(18);
 });
 
 test("the meteogram tab draws the day in one shared plot", async ({ page }) => {
@@ -691,15 +810,73 @@ test("the meteogram tab draws the day in one shared plot", async ({ page }) => {
   await page.locator('.seg[aria-label="View"] button:has-text("Meteogram")').click();
   await expect(page.locator(".meteo-svg")).toBeVisible();
 
-  // continuous cloud bands (closed soft paths), not per-hour bars
-  const clouds = await page.locator("path.meteo-cloud").count();
-  expect(clouds).toBeGreaterThanOrEqual(1);
-  const d = await page.locator("path.meteo-cloud").first().getAttribute("d");
-  expect(d).toContain("Q"); // rounded corners, both ends included
+  // one soft closed shape per continuous layer, gray following the cover
+  const clouds = page.locator("path.meteo-cloud");
+  expect(await clouds.count()).toBeGreaterThanOrEqual(1);
+  const d = await clouds.first().getAttribute("d");
+  expect(d).toContain("Q");
   expect(d).toMatch(/Z$/);
+  const shades = await page.locator("linearGradient.meteo-cloud-shade stop").evaluateAll((els) =>
+    els.map((el) => el.getAttribute("stop-color")),
+  );
+  expect(shades.length).toBeGreaterThan(0);
+  expect(shades.every((color) => color === cloudGray(60))).toBe(true);
+  const wind = page.locator("path.meteo-wind");
+  await expect(wind).toHaveCount(1);
+  const arrows = page.locator(".meteo-arrow");
+  await expect(arrows).toHaveCount(24);
+  await expect(page.locator(".meteo-arrow text")).toHaveCount(0);
+  await expect(arrows.first()).toHaveAttribute("transform", /rotate\(405\)/);
+  const meteoArrowH = await arrows.first().evaluate((el) => (el as SVGGraphicsElement).getBBox().height);
+  expect(meteoArrowH).toBeGreaterThan(13);
+  const frame = await page.locator(".meteo-frame").boundingBox();
+  const arrowBox = await arrows.first().boundingBox();
+  expect(frame).not.toBeNull();
+  expect(arrowBox).not.toBeNull();
+  expect(arrowBox!.y).toBeGreaterThan(frame!.y);
+  expect(arrowBox!.y + arrowBox!.height).toBeLessThan(frame!.y + frame!.height + 2);
+  expect(await wind.getAttribute("d")).not.toMatch(/Z\s*$/);
+  expect(await wind.evaluate((el) => getComputedStyle(el).fill)).toBe("none");
+  const viewBox = await page.locator(".meteo-svg").getAttribute("viewBox");
+  expect(Number(viewBox?.split(" ")[3])).toBeGreaterThan(320);
 
-  // the yellow convective-top line rides the real altitude scale
+  // the yellow convective-top line rides the real altitude scale, to 10 km
   await expect(page.locator(".meteo-cbl")).toHaveCount(1);
+  await expect(page.locator(".meteo-tx")).toHaveText(["0", "5000", "10000"]);
+  await expect(page.locator(".meteo-tx-minor")).toHaveText([
+    "1000",
+    "2000",
+    "3000",
+    "4000",
+    "6000",
+    "7000",
+    "8000",
+    "9000",
+  ]);
+  await expect(page.locator(".meteo-grid-minor")).toHaveCount(8);
+  const unitBox = await page.locator(".meteo-unit").boundingBox();
+  const topTick = await page.locator(".meteo-tx").nth(2).boundingBox();
+  expect(unitBox && topTick).toBeTruthy();
+  const overlaps =
+    unitBox!.x < topTick!.x + topTick!.width &&
+    unitBox!.x + unitBox!.width > topTick!.x &&
+    unitBox!.y < topTick!.y + topTick!.height &&
+    unitBox!.y + unitBox!.height > topTick!.y;
+  expect(overlaps).toBe(false);
+  const axisBoxes = await page.locator(".meteo-tx, .meteo-unit, .meteo-tx-minor").evaluateAll((els) =>
+    els.map((el) => ({
+      kind: el.classList.contains("meteo-tx-minor") ? "minor" : "major",
+      box: el.getBoundingClientRect(),
+    })),
+  );
+  const hits = (
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+  ) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  const majorBoxes = axisBoxes.filter((item) => item.kind === "major").map((item) => item.box);
+  for (const minor of axisBoxes.filter((item) => item.kind === "minor")) {
+    expect(majorBoxes.some((major) => hits(minor.box, major))).toBe(false);
+  }
 
   const meteo = page.locator(".meteo-svg");
   const meteoBox = await meteo.boundingBox();
@@ -708,6 +885,8 @@ test("the meteogram tab draws the day in one shared plot", async ({ page }) => {
   const meteoRead = page.locator(".hover-card strong");
   await expect(meteoRead).toBeVisible();
   await expect(page.locator(".hover-card")).toContainText("°");
+  await expect(page.locator("path.meteo-td")).toHaveCount(0);
+  await expect(page.locator(".hover-card")).not.toContainText("Td");
   const earlier = await meteoRead.innerText();
   expect(earlier).toMatch(/^\d{2}:\d{2}$/);
   await page.mouse.move(meteoBox!.x + meteoBox!.width * 0.42 + 14, meteoBox!.y + meteoBox!.height * 0.45);

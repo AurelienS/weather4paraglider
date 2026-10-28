@@ -1,15 +1,19 @@
 import { describe, expect, test } from "vitest";
 import type { Hour } from "../api/types";
+import { CLOUD_VEIL_PCT, sampleCell } from "./windgram";
 import {
   cblSeries,
-  cloudDecks,
-  cloudMaxM,
+  cloudBands,
+  cloudGray,
+  cloudShade,
+  cloudShadeStops,
+  cloudSpans,
+  METEO_Z_MAX_M,
   meteoHoursForDay,
   meteoHourTicks,
   niceCeil,
   smoothClosedPath,
   spreadLabels,
-  surfaceTd,
   tempRange,
   windMax,
 } from "./meteogram";
@@ -17,7 +21,9 @@ import {
 function hour(
   time: string,
   surface: Partial<Hour["surface"]> = {},
-  profile: Array<{ z: number; t: number; td: number }> = [{ z: 1000, t: 14, td: 8 }],
+  profile: Array<{ z: number; t: number; td: number; cloud?: number }> = [
+    { z: 1000, t: 14, td: 8 },
+  ],
 ): Hour {
   return {
     time,
@@ -45,7 +51,7 @@ function hour(
       t: p.t,
       rh: 50,
       td: p.td,
-      cloud: 0,
+      cloud: p.cloud ?? 0,
       wind: 12,
       dir: 270,
     })),
@@ -82,13 +88,13 @@ describe("axis ranges", () => {
     expect(niceCeil(1.2, 1)).toBe(2);
   });
 
-  test("tempRange spans t2m and the surface dew point, padded by 1°", () => {
+  test("tempRange spans the air temperature, padded by 1°", () => {
     const hours = [
-      hour("2026-08-31T06:00:00+02:00", { t2m: 8.4 }),
+      hour("2026-08-31T06:00:00+02:00", { t2m: 8.4 }, [{ z: 1000, t: 10, td: 0 }]),
       hour("2026-08-31T15:00:00+02:00", { t2m: 21.6 }),
     ];
     const range = tempRange(hours);
-    expect(range.min).toBe(7); // td 8 (lowest profile level) - 1
+    expect(range.min).toBe(7); // 8.4, the dew point of 0 stays off this axis
     expect(range.max).toBe(23); // 21.6 + 1, ceiled
   });
 
@@ -104,30 +110,167 @@ describe("axis ranges", () => {
     expect(windMax(hours)).toBe(40);
   });
 
-  test("cloudMaxM stays in the 3000–5000 m window", () => {
-    const low = [hour("2026-08-31T12:00:00+02:00", { cloudBaseM: 1200 })];
-    const high = [hour("2026-08-31T12:00:00+02:00", { cloudBaseM: 3800 })];
-    expect(cloudMaxM(low)).toBe(5000); // 1200 + 4900 → capped
-    expect(cloudMaxM(high)).toBe(5000);
+  test("the altitude axis is always 10 km", () => {
+    expect(METEO_Z_MAX_M).toBe(10_000);
   });
 });
 
-describe("cloudDecks", () => {
-  test("stacks the three cover layers above the cloud base", () => {
-    const decks = cloudDecks(
-      hour("2026-08-31T12:00:00+02:00", { cloudBaseM: 800, cloudLow: 80, cloudMid: 40, cloudHigh: 0 }),
+/** A stable profile: cloud sits on the levels, with no convective clearing. */
+function veiledProfile(cloudAt: Array<[number, number]>) {
+  return cloudAt.map(([z, cloud]) => ({ z, t: 10 - z / 1000, td: -5, cloud }));
+}
+
+function redOf(color: string): number {
+  return Number(color.match(/\d+/)?.[0]);
+}
+
+describe("cloudShadeStops", () => {
+  test("eases the gray across the whole gap between two hours", () => {
+    const stops = cloudShadeStops(
+      [
+        { x: 0, cover: 10 },
+        { x: 100, cover: 100 },
+      ],
+      0,
+      100,
     );
-    // low: 800 + max(150, 0.8 * 1500) → up to 2000 m
-    expect(decks[0]).toEqual({ baseM: 800, topM: 2000, cover: 80 });
-    // mid: offset 1700 above the base, 0.4 * 1500 thick
-    expect(decks[1]).toEqual({ baseM: 2500, topM: 3100, cover: 40 });
-    // high: cover 0 → no band
-    expect(decks[2]).toBeNull();
+    expect(stops[0]).toEqual({ offset: 0, color: cloudGray(10) });
+    expect(stops.at(-1)).toEqual({ offset: 1, color: cloudGray(100) });
+    const mid = stops.find((stop) => Math.abs(stop.offset - 0.5) < 0.02);
+    expect(mid?.color).not.toBe(cloudGray(10));
+    expect(mid?.color).not.toBe(cloudGray(100));
+    const early = stops.find((stop) => stop.offset > 0.15 && stop.offset < 0.35);
+    expect(early?.color).not.toBe(cloudGray(10));
   });
 
-  test("no cloud base → no decks at all", () => {
-    const decks = cloudDecks(hour("2026-08-31T12:00:00+02:00", { cloudBaseM: null }));
-    expect(decks).toEqual([null, null, null]);
+  test("stays one gray when the cover does not change", () => {
+    const stops = cloudShadeStops(
+      [
+        { x: 10, cover: 60 },
+        { x: 30, cover: 60 },
+      ],
+      0,
+      40,
+    );
+    expect(stops.every((stop) => stop.color === cloudGray(60))).toBe(true);
+    expect(stops.some((stop) => stop.offset > 0.3 && stop.offset < 0.7)).toBe(true);
+  });
+});
+
+describe("cloudShade", () => {
+  test("a thin cover stays pale and overcast goes dark", () => {
+    expect(cloudShade(10)).toBe(0);
+    expect(cloudShade(100)).toBe(1);
+    expect(cloudShade(40)).toBeGreaterThan(cloudShade(10));
+    expect(cloudShade(40)).toBeLessThan(cloudShade(100));
+    expect(cloudShade(0)).toBe(cloudShade(10));
+  });
+
+  test("the gray runs from a pale veil to a dense cloud", () => {
+    expect(redOf(cloudGray(100, "light"))).toBeLessThan(redOf(cloudGray(40, "light")));
+    expect(redOf(cloudGray(40, "light"))).toBeLessThan(redOf(cloudGray(10, "light")));
+    expect(redOf(cloudGray(100, "dark"))).toBeGreaterThan(redOf(cloudGray(10, "dark")));
+  });
+});
+
+describe("cloudSpans", () => {
+  test("follows the windgram veil even when the strict cloud base is missing", () => {
+    // Cover stays under 50 % and RH under 90 %, so the old deck rule drew
+    // nothing. The windgram still veils from 10 %.
+    const h = hour(
+      "2026-08-31T12:00:00+02:00",
+      { cloudBaseM: null, cloudLow: 0, cloudMid: 0, cloudHigh: 0, shortwave: 0 },
+      veiledProfile([
+        [1500, 0],
+        [2500, 40],
+        [3500, 40],
+        [5000, 0],
+      ]),
+    );
+    const spans = cloudSpans(h, 1000);
+    expect(spans).toHaveLength(1);
+    expect(spans[0]!.baseM).toBeGreaterThan(1500);
+    expect(spans[0]!.baseM).toBeLessThanOrEqual(2500);
+    expect(spans[0]!.topM).toBeGreaterThanOrEqual(3500);
+    expect(spans[0]!.topM).toBeLessThan(5000);
+    expect(spans[0]!.cover).toBe(40);
+
+    for (let z = 1500; z <= 5000; z += 250) {
+      const veiled = (sampleCell(h, z, 1000, null).cloud ?? 0) >= CLOUD_VEIL_PCT;
+      const inside = spans.some((s) => z >= s.baseM && z <= s.topM);
+      if (veiled) expect(inside).toBe(true);
+    }
+  });
+
+  test("a cover under the veil draws no slice", () => {
+    const h = hour(
+      "2026-08-31T12:00:00+02:00",
+      { cloudBaseM: null, cloudLow: 0, cloudMid: 0, cloudHigh: 0, shortwave: 0 },
+      veiledProfile([
+        [1500, 0],
+        [3000, 5],
+        [5000, 0],
+      ]),
+    );
+    expect(cloudSpans(h, 1000)).toEqual([]);
+  });
+
+  test("two separated layers stay two slices", () => {
+    const h = hour(
+      "2026-08-31T12:00:00+02:00",
+      { cloudBaseM: null, cloudLow: 0, cloudMid: 0, cloudHigh: 0, shortwave: 0 },
+      veiledProfile([
+        [1500, 0],
+        [2000, 50],
+        [3000, 0],
+        [4500, 0],
+        [5500, 50],
+        [6500, 50],
+        [8000, 0],
+      ]),
+    );
+    const spans = cloudSpans(h, 1000);
+    expect(spans).toHaveLength(2);
+    expect(spans[0]!.topM).toBeLessThan(spans[1]!.baseM);
+  });
+});
+
+describe("cloudBands", () => {
+  const cloudy = (hh: number) =>
+    hour(
+      `2026-08-31T${String(hh).padStart(2, "0")}:00:00+02:00`,
+      { cloudBaseM: null, cloudLow: 0, cloudMid: 0, cloudHigh: 0, shortwave: 0 },
+      veiledProfile([
+        [1500, 0],
+        [2500, 30],
+        [3500, 30],
+        [5000, 0],
+      ]),
+    );
+  const clear = (hh: number) =>
+    hour(
+      `2026-08-31T${String(hh).padStart(2, "0")}:00:00+02:00`,
+      { cloudBaseM: null, cloudLow: 0, cloudMid: 0, cloudHigh: 0, shortwave: 0 },
+      veiledProfile([
+        [1500, 0],
+        [2500, 0],
+        [3500, 0],
+        [5000, 0],
+      ]),
+    );
+
+  test("a day the windgram veils all day is one band", () => {
+    const bands = cloudBands([cloudy(10), cloudy(11), cloudy(12)], 1000);
+    expect(bands).toHaveLength(1);
+    expect(bands[0]!.map((p) => p.hour)).toEqual([10, 11, 12]);
+  });
+
+  test("a clear hour splits the band, and a missing hour does too", () => {
+    const split = cloudBands([cloudy(10), cloudy(11), clear(12), cloudy(13)], 1000);
+    expect(split.map((b) => b.map((p) => p.hour))).toEqual([[10, 11], [13]]);
+
+    const gap = cloudBands([cloudy(10), cloudy(12)], 1000);
+    expect(gap).toHaveLength(2);
   });
 });
 
@@ -155,13 +298,6 @@ describe("cblSeries", () => {
     expect(series[0]?.zM).toBeLessThan(2100);
   });
 
-  test("surfaceTd reads the lowest profile level", () => {
-    const h = hour("2026-08-31T12:00:00+02:00", {}, [
-      { z: 1600, t: 12, td: 4 },
-      { z: 2000, t: 10, td: 1 },
-    ]);
-    expect(surfaceTd(h)).toBe(4);
-  });
 });
 
 describe("meteoHourTicks", () => {

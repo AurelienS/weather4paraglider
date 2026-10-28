@@ -33,7 +33,6 @@ export const en = {
   hoursLateShort: "after",
   meteoLblCloud: "Clouds",
   meteoLblCbl: "Convective layer",
-  meteoLblTd: "Dew point",
   meteoLblWind: "Wind",
   meteoLblGust: "Gusts",
   hourLabel: "Hour",
@@ -145,7 +144,7 @@ export const en = {
   errUnexpected: "An unexpected error occurred.",
   guideTitle: "Getting started",
   guideIntro:
-    "Weather4Paragliding turns free numeric weather models into a windgram and a " +
+    "Finesse des particules turns free numeric weather models into a windgram and a " +
     "sounding, built for free flight. Pick a place, then read the wind layer by layer.",
   guideHowTitle: "A typical session",
   guideHowP1:
@@ -198,8 +197,8 @@ export const en = {
     "thermal before your wing's sink — a cloud overhead can add more, and a strong " +
     "wind increase with height can tear the thermal apart. Follow the blue line across " +
     "the grid — the 0 °C isotherm — to track the freezing level. The grid stops at " +
-    "5 km. When cloud sits above that, See higher opens the rows up to 10 km, " +
-    "where cloud can still affect a flight, and closes them again. Hours run from 8:00 to 20:00. Before 8:00 " +
+    "5 km. See higher opens the rows up to 10 km, every 500 m, on every day, " +
+    "and closes them again. Hours run from 8:00 to 20:00. Before 8:00 " +
     "and After 20:00 open the rest of the day, and close it again.",
     demoSpeed: "wind speed, km/h",
   demoGust: "gust (only when it adds 5 km/h or more)",
@@ -241,7 +240,7 @@ export const en = {
     "unlike some commercial sites that often show a single run per day.",
   guideDataTitle: "Where the data comes from",
   guideDataP1:
-    "Weather4Paragliding has no server of its own: your browser calls the " +
+    "Finesse des particules has no server of its own: your browser calls the " +
     "Open-Meteo API directly, a free service that redistributes the raw output of " +
     "national models. This app reads Météo-France AROME 2.5 km and DWD ICON D2.",
   guideDataP2:

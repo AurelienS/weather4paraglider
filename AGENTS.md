@@ -1,4 +1,4 @@
-# AGENTS.md — Weather4Paragliding (w4p)
+# AGENTS.md — Finesse des particules (w4p)
 
 Frontend-only app: Vite + React 19 + TypeScript. No backend.
 Weather model data (Météo-France AROME/ARPEGE, MeteoSwiss ICON-CH1, DWD

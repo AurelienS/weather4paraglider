@@ -1,4 +1,4 @@
-# Frontend — Weather4Paragliding (w4p)
+# Frontend — Finesse des particules (w4p)
 
 Vite + React 19 + TypeScript, no backend. See the root
 [README](../README.md) for the project overview.

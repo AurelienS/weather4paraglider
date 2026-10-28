@@ -34,7 +34,6 @@ export const fr: Dict = {
   hoursLateShort: "après",
   meteoLblCloud: "Nuages",
   meteoLblCbl: "Couche convective",
-  meteoLblTd: "Rosée",
   meteoLblWind: "Vent",
   meteoLblGust: "Rafales",
   hourLabel: "Heure",
@@ -146,7 +145,7 @@ export const fr: Dict = {
   errUnexpected: "Une erreur inattendue est survenue.",
   guideTitle: "Premiers pas",
   guideIntro:
-    "Weather4Paragliding transforme les modèles météo numériques libres en windgram " +
+    "Finesse des particules transforme les modèles météo numériques libres en windgram " +
     "et émagramme, pensé pour le vol libre. Choisissez un lieu, puis lisez le vent " +
     "couche par couche.",
   guideHowTitle: "Une session type",
@@ -206,8 +205,8 @@ export const fr: Dict = {
     "cumulus au-dessus peut en ajouter, et un vent qui forcit avec l'altitude peut " +
     "déchirer le thermique. Repérez la ligne bleue en travers de la grille — " +
     "l'isotherme 0 °C — pour suivre le niveau de gel. La grille s'arrête à 5 km. " +
-    "S'il y a des nuages au-dessus, Voir plus haut ouvre les lignes jusqu'à 10 km, " +
-    "là où un nuage peut encore influencer le vol, et les referme. Les heures vont de 8 h à 20 h. Avant 8 h " +
+    "Voir plus haut ouvre les lignes jusqu'à 10 km, tous les 500 m, " +
+    "chaque jour, et les referme. Les heures vont de 8 h à 20 h. Avant 8 h " +
     "et Après 20 h ouvrent le reste de la journée, et le referment.",
     demoSpeed: "vitesse du vent, km/h",
   demoGust: "rafale (affichée si elle ajoute 5 km/h ou plus)",
@@ -252,7 +251,7 @@ export const fr: Dict = {
     "contrairement à certains sites payants qui n'affichent souvent qu'un run par jour.",
   guideDataTitle: "D'où viennent les données ?",
   guideDataP1:
-    "Weather4Paragliding n'a pas de serveur : votre navigateur appelle " +
+    "Finesse des particules n'a pas de serveur : votre navigateur appelle " +
     "directement l'API Open-Meteo, un service gratuit qui redistribue la sortie " +
     "brute des modèles nationaux. Cette application lit AROME 2,5 km de " +
     "Météo-France et ICON D2 du DWD.",

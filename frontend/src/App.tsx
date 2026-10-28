@@ -316,7 +316,7 @@ export default function App() {
             onClick={goHome}
           >
             <span className="brand-lockup">
-              <h1>Weather4Paragliding</h1>
+              <h1>Finesse des particules</h1>
             </span>
           </a>
           <PageNav page={page} onNavigate={navigate} />
